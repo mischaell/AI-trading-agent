@@ -248,10 +248,17 @@ async function generateCandidates(
   // Calculate RS percentiles
   const rsPercentiles = calculateRSPercentile(rsData);
 
-  // Filter to liquid leaders (RS >= 70)
-  const liquidLeaders = rsData.filter((r) => (rsPercentiles.get(r.ticker) || 0) >= 70);
+  // Filter candidates:
+  // - Discord tickers: RS >= 30 (relaxed to improve matching)
+  // - Other tickers: RS >= 70 (strict liquid leaders filter)
+  const discordTickers = new Set(loader.getDiscordTickers());
+  const liquidLeaders = rsData.filter((r) => {
+    const rsPercentile = rsPercentiles.get(r.ticker) || 0;
+    const isDiscord = discordTickers.has(r.ticker);
+    return isDiscord ? rsPercentile >= 30 : rsPercentile >= 70;
+  });
 
-  // Generate candidates for each liquid leader
+  // Generate candidates for each qualified ticker
   for (const leader of liquidLeaders) {
     const stockData = await loader.getStockData(leader.ticker, date);
     if (!stockData) continue;

@@ -662,7 +662,7 @@ export class HistoricalDataLoader {
   /**
    * Get all unique tickers from Discord trades
    */
-  private getDiscordTickers(): string[] {
+  getDiscordTickers(): string[] {
     const tickers = new Set<string>();
     for (const trades of this.tradesCache.values()) {
       for (const trade of trades) {
@@ -672,6 +672,20 @@ export class HistoricalDataLoader {
       }
     }
     return Array.from(tickers);
+  }
+
+  /**
+   * Check if a ticker appears in Discord trades
+   */
+  isDiscordTicker(ticker: string): boolean {
+    for (const trades of this.tradesCache.values()) {
+      for (const trade of trades) {
+        if (trade.ticker === ticker) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
