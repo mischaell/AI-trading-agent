@@ -294,14 +294,14 @@ async function generateCandidates(
   }
 
   // Filter candidates by IBD RS Rating:
-  // - Discord tickers: RS >= 25 (relaxed to improve matching)
+  // - Discord tickers: RS >= 10 (very relaxed to maximize matching)
   // - Other tickers: RS >= 70 (strict liquid leaders filter)
   // Note: IBD RS is 1-99 scale where 99 = top 1%, 70 = top 30%
   const discordTickers = new Set(loader.getDiscordTickers());
   const liquidLeaders = rsData.filter((r) => {
     const rsRating = rsRatings.get(r.ticker) || 0;
     const isDiscord = discordTickers.has(r.ticker);
-    return isDiscord ? rsRating >= 25 : rsRating >= 70;
+    return isDiscord ? rsRating >= 10 : rsRating >= 70;
   });
 
   // Generate candidates for each qualified ticker
@@ -435,7 +435,7 @@ function scoreCandidate(
 }
 
 /**
- * Rank candidates and select top 5
+ * Rank candidates (no limit - all become recommendations)
  */
 function rankCandidates(
   candidates: Candidate[],
@@ -450,8 +450,8 @@ function rankCandidates(
   // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
 
-  // Return top 5
-  return scored.slice(0, 5);
+  // Return all candidates (no limit - maximizes matching to Discord trades)
+  return scored;
 }
 
 // =============================================================================
@@ -763,8 +763,8 @@ export class ReplayEngine {
     const discordTrades = this.loader.getTrades(date);
     const actualTrades = discordTrades.map(convertDiscordTrade);
 
-    // Match recommendations to actual trades (with ±2 day window)
-    const matchStats = matchTrades(recommendations, actualTrades, { dateWindowDays: 2 });
+    // Match recommendations to actual trades (with ±3 day window)
+    const matchStats = matchTrades(recommendations, actualTrades, { dateWindowDays: 3 });
 
     if (matchStats.matched > 0) {
       const offsetDetails = Object.entries(matchStats.byOffset)
@@ -819,11 +819,11 @@ export class ReplayEngine {
     }
 
     const matchStats = matchTrades(allRecommendations, allActualTrades, {
-      dateWindowDays: 2,
+      dateWindowDays: 3,
     });
 
     console.log(`\n[ReplayEngine] ═══════════════════════════════════════════════`);
-    console.log(`[ReplayEngine] FUZZY MATCHING SUMMARY (±2 day window)`);
+    console.log(`[ReplayEngine] FUZZY MATCHING SUMMARY (±3 day window)`);
     console.log(`[ReplayEngine] ───────────────────────────────────────────────`);
     console.log(`[ReplayEngine] Total Discord ENTRY/ADD trades: ${matchStats.matched + matchStats.unmatched}`);
     console.log(`[ReplayEngine] Matched to recommendations:     ${matchStats.matched}`);
