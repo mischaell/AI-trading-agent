@@ -344,6 +344,30 @@ export interface DailyBacktestResult {
   recommendations: TradeRecommendation[];
   actual_trades: ActualTrade[];
   outcomes: TradeOutcome[];
+  // Direct Discord trades (with/without recommendations)
+  discord_outcomes: DiscordTradeOutcome[];
+}
+
+/**
+ * Outcome for a Discord trade (tracked regardless of recommendation match)
+ */
+export interface DiscordTradeOutcome {
+  trade: ActualTrade;
+
+  // Match status
+  matched_recommendation: TradeRecommendation | null;
+  match_type: "exact" | "fuzzy" | "unmatched";
+  match_day_offset: number | null; // 0, 1, 2 for fuzzy matches
+
+  // Outcome (from Discord data or forward simulation)
+  exit_date: string | null;
+  exit_reason: ExitReason;
+  r_achieved: number | null;
+  gain_pct: number | null;
+  holding_days: number | null;
+
+  // Source of outcome
+  outcome_source: "discord" | "simulated";
 }
 
 export interface BacktestResult {

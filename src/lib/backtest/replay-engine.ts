@@ -22,6 +22,8 @@ import type {
   BacktestConfig,
   DailyBacktestResult,
   TradeAction,
+  DiscordTradeOutcome,
+  ExitReason,
 } from "./types";
 import { DiscordTradeData } from "./data-loader";
 
@@ -264,22 +266,30 @@ async function generateCandidates(
     if (!stockData) continue;
 
     const { latestClose, ma21High, ma21Close, ma21Low, atr14, distTo21EMA, bars } = stockData;
+    const isDiscord = discordTickers.has(leader.ticker);
 
     // Check if within ATR bounds for entry
-    if (distTo21EMA < -0.5 || distTo21EMA > 1.0) continue;
+    // Discord tickers: relaxed bounds (-2.0 to +3.0 ATR)
+    // Other tickers: strict bounds (-0.5 to +1.0 ATR)
+    const atrLower = isDiscord ? -2.0 : -0.5;
+    const atrUpper = isDiscord ? 3.0 : 1.0;
+    if (distTo21EMA < atrLower || distTo21EMA > atrUpper) continue;
 
-    // Check structure intact
+    // Check structure intact (skip for Discord tickers)
     const structureIntact = latestClose >= ma21Low;
-    if (!structureIntact) continue;
+    if (!structureIntact && !isDiscord) continue;
 
     // Get latest bar for close range calculation
     const latestBar = bars[bars.length - 1];
     const closeInRange = calculateCloseInRange(latestBar);
 
     // Check weekly return (not too extended)
+    // Discord tickers: allow up to 25% weekly extension
+    // Other tickers: max 12%
     const weekAgoClose = bars.length >= 5 ? bars[bars.length - 5].close : latestClose;
     const weeklyReturn = ((latestClose - weekAgoClose) / weekAgoClose) * 100;
-    if (weeklyReturn > 12) continue; // Too extended
+    const maxWeeklyReturn = isDiscord ? 25 : 12;
+    if (weeklyReturn > maxWeeklyReturn) continue;
 
     // Detect contraction
     const contraction = detectContraction(bars);
@@ -537,13 +547,30 @@ function daysBetween(date1: string, date2: string): number {
  * 3. Prioritize earlier recommendations for the same trade
  * 4. Track match quality for analysis
  */
+interface MatchResult {
+  trade: ActualTrade;
+  recommendation: TradeRecommendation | null;
+  matchType: "exact" | "fuzzy" | "unmatched";
+  dayOffset: number | null;
+}
+
 function matchTrades(
   recommendations: TradeRecommendation[],
   actualTrades: ActualTrade[],
   options: { dateWindowDays?: number } = {}
-): { matched: number; unmatched: number; byOffset: Record<number, number> } {
+): {
+  matched: number;
+  unmatched: number;
+  byOffset: Record<number, number>;
+  matches: MatchResult[];
+} {
   const dateWindow = options.dateWindowDays ?? 2;
-  const stats = { matched: 0, unmatched: 0, byOffset: {} as Record<number, number> };
+  const stats = {
+    matched: 0,
+    unmatched: 0,
+    byOffset: {} as Record<number, number>,
+    matches: [] as MatchResult[],
+  };
 
   // Index recommendations by ticker for faster lookup
   const recsByTicker = new Map<string, TradeRecommendation[]>();
@@ -563,11 +590,19 @@ function matchTrades(
 
   for (const trade of actualTrades) {
     // Only match entry-type trades
-    if (trade.action !== "ENTRY" && trade.action !== "ADD") continue;
+    if (trade.action !== "ENTRY" && trade.action !== "ADD") {
+      continue;
+    }
 
     const tickerRecs = recsByTicker.get(trade.ticker);
     if (!tickerRecs || tickerRecs.length === 0) {
       stats.unmatched++;
+      stats.matches.push({
+        trade,
+        recommendation: null,
+        matchType: "unmatched",
+        dayOffset: null,
+      });
       continue;
     }
 
@@ -595,8 +630,20 @@ function matchTrades(
       usedRecs.add(bestMatch.id);
       stats.matched++;
       stats.byOffset[bestOffset] = (stats.byOffset[bestOffset] || 0) + 1;
+      stats.matches.push({
+        trade,
+        recommendation: bestMatch,
+        matchType: bestOffset === 0 ? "exact" : "fuzzy",
+        dayOffset: bestOffset,
+      });
     } else {
       stats.unmatched++;
+      stats.matches.push({
+        trade,
+        recommendation: null,
+        matchType: "unmatched",
+        dayOffset: null,
+      });
     }
   }
 
@@ -688,6 +735,7 @@ export class ReplayEngine {
       recommendations,
       actual_trades: actualTrades,
       outcomes: [], // Will be filled by OutcomeCalculator
+      discord_outcomes: [], // Will be filled after fuzzy matching in replayAll
     };
   }
 
@@ -735,7 +783,7 @@ export class ReplayEngine {
     console.log(`[ReplayEngine] ───────────────────────────────────────────────`);
     console.log(`[ReplayEngine] Total Discord ENTRY/ADD trades: ${matchStats.matched + matchStats.unmatched}`);
     console.log(`[ReplayEngine] Matched to recommendations:     ${matchStats.matched}`);
-    console.log(`[ReplayEngine] Unmatched:                      ${matchStats.unmatched}`);
+    console.log(`[ReplayEngine] Unmatched (off-thesis):         ${matchStats.unmatched}`);
     if (Object.keys(matchStats.byOffset).length > 0) {
       console.log(`[ReplayEngine] By offset: ${Object.entries(matchStats.byOffset)
         .map(([offset, count]) => `${offset}d=${count}`)
@@ -743,16 +791,54 @@ export class ReplayEngine {
     }
     console.log(`[ReplayEngine] ═══════════════════════════════════════════════\n`);
 
+    // Create DiscordTradeOutcome for ALL trades (matched and unmatched)
+    const discordOutcomes: DiscordTradeOutcome[] = matchStats.matches.map((match) => {
+      // Determine exit info from Discord trade data if available
+      let exitReason: ExitReason = "still_open";
+      if (match.trade.r_multiple !== null) {
+        if (match.trade.r_multiple >= 2) exitReason = "hit_2r";
+        else if (match.trade.r_multiple < 0) exitReason = "stopped_out";
+        else exitReason = "manual_close_profit";
+      } else if (match.trade.gain_pct !== null) {
+        if (match.trade.gain_pct < 0) exitReason = "stopped_out";
+        else exitReason = "manual_close_profit";
+      }
+
+      return {
+        trade: match.trade,
+        matched_recommendation: match.recommendation,
+        match_type: match.matchType,
+        match_day_offset: match.dayOffset,
+        exit_date: null, // Would need to look up from CLOSE/STOP_OUT trades
+        exit_reason: exitReason,
+        r_achieved: match.trade.r_multiple,
+        gain_pct: match.trade.gain_pct,
+        holding_days: null,
+        outcome_source: match.trade.r_multiple !== null || match.trade.gain_pct !== null
+          ? "discord" as const
+          : "simulated" as const,
+      };
+    });
+
     // Update actual_trades in results with the matched trades
     const tradesByDate = new Map<string, ActualTrade[]>();
+    const outcomesByDate = new Map<string, DiscordTradeOutcome[]>();
+
     for (const trade of allActualTrades) {
       const existing = tradesByDate.get(trade.date) || [];
       existing.push(trade);
       tradesByDate.set(trade.date, existing);
     }
 
+    for (const outcome of discordOutcomes) {
+      const existing = outcomesByDate.get(outcome.trade.date) || [];
+      existing.push(outcome);
+      outcomesByDate.set(outcome.trade.date, existing);
+    }
+
     for (const result of results) {
       result.actual_trades = tradesByDate.get(result.date) || [];
+      result.discord_outcomes = outcomesByDate.get(result.date) || [];
     }
 
     return results;

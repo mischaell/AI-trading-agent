@@ -22,6 +22,7 @@ import type {
   EntryMode,
   Grade,
   MarketState,
+  DiscordTradeOutcome,
 } from "./types";
 import { aggregateOutcomes, filterExecuted, filterWinners, filterLosers } from "./outcome-calculator";
 
@@ -512,6 +513,47 @@ export class PerformanceAnalyzer {
     report += "─".repeat(70) + "\n";
     for (const trade of result.worst_trades) {
       report += `${trade.recommendation.ticker} (${trade.recommendation.date}): ${trade.r_achieved?.toFixed(2)}R - ${trade.exit_reason}\n`;
+    }
+    report += "\n";
+
+    // Discord Trade Breakdown
+    const allDiscordOutcomes = result.daily_results.flatMap((r) => r.discord_outcomes || []);
+    if (allDiscordOutcomes.length > 0) {
+      report += "─".repeat(70) + "\n";
+      report += "DISCORD TRADE BREAKDOWN (All ENTRY/ADD)\n";
+      report += "─".repeat(70) + "\n";
+
+      const matched = allDiscordOutcomes.filter((o) => o.match_type !== "unmatched");
+      const unmatched = allDiscordOutcomes.filter((o) => o.match_type === "unmatched");
+
+      report += `Total Discord Trades:  ${allDiscordOutcomes.length}\n`;
+      report += `Matched (on-thesis):   ${matched.length} (${((matched.length / allDiscordOutcomes.length) * 100).toFixed(1)}%)\n`;
+      report += `Unmatched (off-thesis): ${unmatched.length} (${((unmatched.length / allDiscordOutcomes.length) * 100).toFixed(1)}%)\n\n`;
+
+      // Calculate win rates for matched vs unmatched
+      const matchedWithR = matched.filter((o) => o.r_achieved !== null);
+      const unmatchedWithR = unmatched.filter((o) => o.r_achieved !== null);
+
+      const matchedWinners = matchedWithR.filter((o) => (o.r_achieved || 0) > 0);
+      const unmatchedWinners = unmatchedWithR.filter((o) => (o.r_achieved || 0) > 0);
+
+      if (matchedWithR.length > 0) {
+        const matchedWinRate = (matchedWinners.length / matchedWithR.length) * 100;
+        const matchedAvgR = matchedWithR.reduce((s, o) => s + (o.r_achieved || 0), 0) / matchedWithR.length;
+        report += `Matched Win Rate:      ${matchedWinRate.toFixed(1)}% (${matchedWinners.length}/${matchedWithR.length}), Avg R: ${matchedAvgR.toFixed(2)}\n`;
+      }
+
+      if (unmatchedWithR.length > 0) {
+        const unmatchedWinRate = (unmatchedWinners.length / unmatchedWithR.length) * 100;
+        const unmatchedAvgR = unmatchedWithR.reduce((s, o) => s + (o.r_achieved || 0), 0) / unmatchedWithR.length;
+        report += `Unmatched Win Rate:    ${unmatchedWinRate.toFixed(1)}% (${unmatchedWinners.length}/${unmatchedWithR.length}), Avg R: ${unmatchedAvgR.toFixed(2)}\n`;
+      }
+
+      // Show unmatched tickers
+      if (unmatched.length > 0) {
+        const unmatchedTickers = [...new Set(unmatched.map((o) => o.trade.ticker))].sort();
+        report += `\nOff-Thesis Tickers:    ${unmatchedTickers.join(", ")}\n`;
+      }
     }
 
     report += "\n" + "═".repeat(70) + "\n";
