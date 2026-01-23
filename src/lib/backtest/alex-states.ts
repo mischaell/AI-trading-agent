@@ -673,5 +673,8 @@ export {
   STATE_PATTERNS
 };
 
-// Run if executed directly
-main().catch(console.error);
+// Run if executed directly (not imported as module)
+const isMainModule = process.argv[1]?.includes("alex-states");
+if (isMainModule) {
+  main().catch(console.error);
+}

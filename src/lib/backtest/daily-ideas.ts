@@ -15,6 +15,8 @@
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
+import * as fs from "fs";
+import * as path from "path";
 import { HistoricalDataLoader } from "./data-loader";
 import type {
   DailyContext,
@@ -23,6 +25,12 @@ import type {
   MarketState,
   Grade,
 } from "./types";
+import {
+  loadJournalEntries,
+  aggregateDailyStates,
+  type AlexState,
+  type DailyState,
+} from "./alex-states";
 
 // =============================================================================
 // Configuration
@@ -65,6 +73,124 @@ import {
   generateCandidates,
   rankCandidates,
 } from "./replay-engine";
+
+// =============================================================================
+// Alex State Integration
+// =============================================================================
+
+interface AlexStateContext {
+  state: AlexState;
+  confidence: number;
+  topSignal: string;
+  recommendation: string;
+  positionSizeMultiplier: number;  // Adjust position sizes based on state
+  allowNewEntries: boolean;
+  allowAdds: boolean;
+}
+
+const STATE_RECOMMENDATIONS: Record<AlexState, {
+  recommendation: string;
+  positionMultiplier: number;
+  allowEntries: boolean;
+  allowAdds: boolean;
+}> = {
+  TESTING: {
+    recommendation: "Small pilots only (0.125-0.25% risk). Market uncertain.",
+    positionMultiplier: 0.5,  // Half size
+    allowEntries: true,
+    allowAdds: false
+  },
+  PRESSING: {
+    recommendation: "Add to winners. Delta positive, cushion allows aggression.",
+    positionMultiplier: 1.2,  // Slightly larger
+    allowEntries: true,
+    allowAdds: true
+  },
+  TRIMMING: {
+    recommendation: "Trim into strength. Lock in gains, reduce exposure.",
+    positionMultiplier: 0.7,
+    allowEntries: false,
+    allowAdds: false
+  },
+  DEFENSIVE: {
+    recommendation: "Capital preservation. No new entries, manage risk tight.",
+    positionMultiplier: 0.5,
+    allowEntries: false,
+    allowAdds: false
+  },
+  SELLING: {
+    recommendation: "⚠️ QQQE lost 21dma structure. ALL CASH. No new positions.",
+    positionMultiplier: 0,
+    allowEntries: false,
+    allowAdds: false
+  },
+  NEUTRAL: {
+    recommendation: "Normal operations. Follow standard filters.",
+    positionMultiplier: 1.0,
+    allowEntries: true,
+    allowAdds: true
+  }
+};
+
+function getAlexStateForDate(date: string): AlexStateContext {
+  const journalPath = path.join(
+    process.cwd(),
+    "data/discord-exports/alex-journal.json"
+  );
+
+  // Default to NEUTRAL if no journal data
+  if (!fs.existsSync(journalPath)) {
+    return {
+      state: "NEUTRAL",
+      confidence: 0,
+      topSignal: "No journal data",
+      recommendation: STATE_RECOMMENDATIONS.NEUTRAL.recommendation,
+      positionSizeMultiplier: 1.0,
+      allowNewEntries: true,
+      allowAdds: true
+    };
+  }
+
+  const entries = loadJournalEntries(journalPath);
+  const dailyStates = aggregateDailyStates(entries);
+  const daily = dailyStates.get(date);
+
+  if (!daily) {
+    return {
+      state: "NEUTRAL",
+      confidence: 0,
+      topSignal: "No data for date",
+      recommendation: STATE_RECOMMENDATIONS.NEUTRAL.recommendation,
+      positionSizeMultiplier: 1.0,
+      allowNewEntries: true,
+      allowAdds: true
+    };
+  }
+
+  const stateConfig = STATE_RECOMMENDATIONS[daily.primaryState];
+  const topSignal = daily.signals.length > 0
+    ? daily.signals[0].keywords[0] || ""
+    : "";
+
+  // Calculate confidence from scores
+  const maxScore = Math.max(
+    daily.summary.testingScore,
+    daily.summary.pressingScore,
+    daily.summary.trimmingScore,
+    daily.summary.defensiveScore,
+    daily.summary.sellingScore
+  );
+
+  return {
+    state: daily.primaryState,
+    confidence: Math.min(1, maxScore),
+    topSignal,
+    recommendation: stateConfig.recommendation,
+    positionSizeMultiplier: stateConfig.positionMultiplier,
+    allowNewEntries: stateConfig.allowEntries,
+    allowAdds: stateConfig.allowAdds
+  };
+}
 
 // =============================================================================
 // Trade Idea Type
@@ -337,7 +463,12 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function formatIdeas(ideas: TradeIdea[], date: string, equity: number = 100000): string {
+function formatIdeas(
+  ideas: TradeIdea[],
+  date: string,
+  equity: number = 100000,
+  alexState?: AlexStateContext
+): string {
   const lines: string[] = [];
   const width = 78;
 
@@ -351,6 +482,36 @@ function formatIdeas(ideas: TradeIdea[], date: string, equity: number = 100000):
     const entries = ideas[0].permissions.newEntries ? "✓" : "✗";
     const adds = ideas[0].permissions.adds ? "✓" : "✗";
     lines.push("│" + `  Market: ${market} | Entries: ${entries} | Adds: ${adds}`.padEnd(width - 2) + "│");
+  }
+
+  // Alex State Section
+  if (alexState) {
+    lines.push("├" + "─".repeat(width - 2) + "┤");
+    const stateIcon = {
+      TESTING: "🔬",
+      PRESSING: "📈",
+      TRIMMING: "✂️",
+      DEFENSIVE: "🛡️",
+      SELLING: "🚨",
+      NEUTRAL: "➖"
+    }[alexState.state] || "➖";
+
+    lines.push("│" + `  Alex State: ${stateIcon} ${alexState.state}`.padEnd(width - 2) + "│");
+    lines.push("│" + `  ${alexState.recommendation}`.padEnd(width - 2) + "│");
+
+    // Show permissions based on Alex state
+    const entryStatus = alexState.allowNewEntries ? "✓ Entries OK" : "✗ NO Entries";
+    const addStatus = alexState.allowAdds ? "✓ Adds OK" : "✗ NO Adds";
+    const sizeAdj = alexState.positionSizeMultiplier !== 1.0
+      ? ` | Size: ${(alexState.positionSizeMultiplier * 100).toFixed(0)}%`
+      : "";
+    lines.push("│" + `  ${entryStatus} | ${addStatus}${sizeAdj}`.padEnd(width - 2) + "│");
+
+    // Warning for SELLING state
+    if (alexState.state === "SELLING") {
+      lines.push("│" + " ".repeat(width - 2) + "│");
+      lines.push("│" + "  ⚠️  QQQE BELOW 21DMA STRUCTURE - STAY IN CASH ⚠️".padEnd(width - 2) + "│");
+    }
   }
 
   lines.push("├" + "─".repeat(width - 2) + "┤");
@@ -493,17 +654,30 @@ async function main() {
   console.log();
 
   try {
+    // Get Alex state for the date
+    console.log(`[DailyIdeas] Loading Alex state for ${date}...`);
+    const alexState = getAlexStateForDate(date);
+    console.log(`[DailyIdeas] Alex State: ${alexState.state}`);
+
+    // Adjust filter based on Alex state
     const filter: FilterConfig = {
       ...DEFAULT_FILTER,
       equity,
     };
+
+    // Apply position size multiplier from Alex state
+    if (alexState.positionSizeMultiplier !== 1.0) {
+      filter.targetNER = DEFAULT_FILTER.targetNER * alexState.positionSizeMultiplier;
+      console.log(`[DailyIdeas] Adjusted NER target: ${filter.targetNER.toFixed(3)}%`);
+    }
+
     const ideas = await generateDailyIdeas(date, filter);
 
     console.log();
     if (format === "json") {
       console.log(formatJSON(ideas));
     } else {
-      console.log(formatIdeas(ideas, date, equity));
+      console.log(formatIdeas(ideas, date, equity, alexState));
     }
 
     // Summary
@@ -516,6 +690,21 @@ async function main() {
       const totalEntryRisk = ideas.reduce((s, i) => s + i.entry.riskPct, 0);
       console.log(`Average Score: ${avgScore.toFixed(1)} | Average RS: ${avgRS.toFixed(1)}`);
       console.log(`Total Entry Risk (all ideas): ${totalEntryRisk.toFixed(2)}% NER`);
+    }
+
+    // State-based warning
+    if (alexState.state === "SELLING") {
+      console.log();
+      console.log("🚨 ALEX STATE: SELLING - QQQE below 21dma structure");
+      console.log("   DO NOT take new positions. Stay in cash until structure reclaims.");
+    } else if (alexState.state === "DEFENSIVE") {
+      console.log();
+      console.log("🛡️ ALEX STATE: DEFENSIVE - Capital preservation mode");
+      console.log("   Reduce new entries. Focus on managing existing positions.");
+    } else if (alexState.state === "TRIMMING") {
+      console.log();
+      console.log("✂️ ALEX STATE: TRIMMING - Taking profits into strength");
+      console.log("   Lock in gains. Reduce exposure, don't add new positions.");
     }
 
   } catch (error) {
