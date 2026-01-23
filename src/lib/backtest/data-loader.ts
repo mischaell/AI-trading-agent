@@ -6,6 +6,33 @@
  * - Actual trades from Supabase (discord_trades)
  * - Price data from Yahoo Finance
  *
+ * ## Yahoo Finance API Best Practices
+ *
+ * The Yahoo Finance API has rate limits and can be slow for large backtests.
+ * To avoid performance issues:
+ *
+ * 1. **Pre-fetch OHLC data in bulk**: Instead of fetching per-ticker-per-day
+ *    (O(days × tickers) API calls), fetch full date range once per ticker
+ *    (O(tickers) API calls). This reduces 24,000+ calls to ~100 calls.
+ *
+ * 2. **Use the preloadOHLC() method**: Call this at initialization with all
+ *    tickers needed for the backtest period. The cache stores full history.
+ *
+ * 3. **Batch requests with delays**: When pre-fetching, use batches of 5
+ *    concurrent requests with 100ms delays to avoid rate limits.
+ *
+ * 4. **Request sufficient history**: For IBD-style RS calculations, you need
+ *    ~252 trading days (1 year) of data. The preloader fetches 280 days
+ *    before the start date to ensure warmup data is available.
+ *
+ * Example usage:
+ * ```typescript
+ * const loader = new HistoricalDataLoader(startDate, endDate);
+ * await loader.preload(); // Load newsletter + Discord trades
+ * await loader.preloadOHLC(tickers); // Pre-fetch all OHLC data
+ * // Now getStockData() will use cache instead of API calls
+ * ```
+ *
  * @module backtest/data-loader
  */
 
@@ -552,6 +579,10 @@ export class HistoricalDataLoader {
   private tradesCache: Map<string, DiscordTradeData[]> = new Map();
   private stockDataCache: Map<string, StockData> = new Map();
 
+  // Full OHLC history cache: ticker -> all bars for entire date range
+  private ohlcCache: Map<string, OHLC[]> = new Map();
+  private ohlcPreloaded: boolean = false;
+
   constructor(
     private startDate: string,
     private endDate: string
@@ -570,6 +601,92 @@ export class HistoricalDataLoader {
     this.tradesCache = await loadDiscordTrades(this.startDate, this.endDate);
 
     console.log(`[HistoricalDataLoader] Preload complete`);
+  }
+
+  /**
+   * Pre-fetch all OHLC data for all tickers in one batch
+   * This dramatically reduces API calls from O(days × tickers) to O(tickers)
+   */
+  async preloadOHLC(tickers: string[], onProgress?: (completed: number, total: number, ticker: string) => void): Promise<void> {
+    console.log(`[HistoricalDataLoader] Pre-fetching OHLC for ${tickers.length} tickers...`);
+
+    // Calculate date range: start 60 days before startDate for warmup, extend to endDate
+    const warmupDays = 280; // ~1 year of history for RS calculations
+    const fetchStartDate = new Date(this.startDate);
+    fetchStartDate.setDate(fetchStartDate.getDate() - warmupDays);
+    const fetchEndDate = new Date(this.endDate);
+
+    let completed = 0;
+    const batchSize = 5; // Concurrent fetches
+
+    for (let i = 0; i < tickers.length; i += batchSize) {
+      const batch = tickers.slice(i, i + batchSize);
+
+      await Promise.all(
+        batch.map(async (ticker) => {
+          try {
+            const result = await yahooFinance.chart(ticker, {
+              period1: fetchStartDate,
+              period2: fetchEndDate,
+              interval: "1d",
+            });
+
+            const quotes = result?.quotes || [];
+            const bars: OHLC[] = quotes
+              .filter((q) => q.open && q.high && q.low && q.close)
+              .map((q) => ({
+                date: new Date(q.date).toISOString().split("T")[0],
+                open: q.open!,
+                high: q.high!,
+                low: q.low!,
+                close: q.close!,
+                volume: q.volume || 0,
+              }));
+
+            if (bars.length > 0) {
+              this.ohlcCache.set(ticker, bars);
+            }
+          } catch (error) {
+            // Silently skip failed tickers (delisted, etc.)
+          }
+
+          completed++;
+          onProgress?.(completed, tickers.length, batch[0]);
+        })
+      );
+
+      // Small delay between batches to avoid rate limits
+      if (i + batchSize < tickers.length) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+
+    this.ohlcPreloaded = true;
+    console.log(`[HistoricalDataLoader] OHLC preload complete: ${this.ohlcCache.size} tickers cached`);
+  }
+
+  /**
+   * Get OHLC bars for a ticker up to a specific date (from cache)
+   */
+  getOHLCAsOf(ticker: string, asOfDate: string, lookbackDays: number = 60): OHLC[] | null {
+    const allBars = this.ohlcCache.get(ticker);
+    if (!allBars) return null;
+
+    // Filter bars up to asOfDate
+    const filteredBars = allBars.filter((b) => b.date <= asOfDate);
+
+    // Return last N bars
+    if (filteredBars.length < lookbackDays) {
+      return filteredBars;
+    }
+    return filteredBars.slice(-lookbackDays);
+  }
+
+  /**
+   * Check if OHLC data has been preloaded
+   */
+  isOHLCPreloaded(): boolean {
+    return this.ohlcPreloaded;
   }
 
   /**
@@ -627,18 +744,117 @@ export class HistoricalDataLoader {
 
   /**
    * Get stock data for a ticker as of a date
+   * Uses preloaded OHLC cache if available for much faster performance
+   *
+   * @param ticker - Stock ticker symbol
+   * @param date - Date in YYYY-MM-DD format
+   * @param lookbackDays - Number of bars to include (default 280 for full RS calculation)
    */
-  async getStockData(ticker: string, date: string): Promise<StockData | null> {
-    const cacheKey = `${ticker}:${date}`;
+  async getStockData(ticker: string, date: string, lookbackDays: number = 280): Promise<StockData | null> {
+    const cacheKey = `${ticker}:${date}:${lookbackDays}`;
 
     if (!this.stockDataCache.has(cacheKey)) {
-      const data = await getStockDataAsOf(ticker, date);
+      let data: StockData | null = null;
+
+      // Use preloaded OHLC cache if available
+      if (this.ohlcPreloaded) {
+        data = this.getStockDataFromCache(ticker, date, lookbackDays);
+      } else {
+        // Fall back to fetching (slower)
+        data = await getStockDataAsOf(ticker, date);
+      }
+
       if (data) {
         this.stockDataCache.set(cacheKey, data);
       }
     }
 
     return this.stockDataCache.get(cacheKey) || null;
+  }
+
+  /**
+   * Calculate StockData from preloaded OHLC cache (no API call)
+   */
+  private getStockDataFromCache(ticker: string, date: string, lookbackDays: number = 280): StockData | null {
+    const bars = this.getOHLCAsOf(ticker, date, lookbackDays);
+
+    if (!bars || bars.length < 21) {
+      return null;
+    }
+
+    const latestBar = bars[bars.length - 1];
+    const structure = this.calculate21EMAStructure(bars);
+    const atr = this.calculateATR(bars);
+
+    const distTo21EMA = atr > 0
+      ? (latestBar.close - structure.maClose) / atr
+      : 0;
+
+    return {
+      ticker,
+      bars,
+      latestClose: latestBar.close,
+      ma21High: structure.maHigh,
+      ma21Close: structure.maClose,
+      ma21Low: structure.maLow,
+      atr14: atr,
+      distTo21EMA,
+    };
+  }
+
+  /**
+   * Calculate 21EMA structure (high, close, low bands)
+   */
+  private calculate21EMAStructure(bars: OHLC[]): {
+    maHigh: number;
+    maClose: number;
+    maLow: number;
+  } {
+    if (bars.length < 21) {
+      const last = bars[bars.length - 1];
+      return {
+        maHigh: last?.high || 0,
+        maClose: last?.close || 0,
+        maLow: last?.low || 0,
+      };
+    }
+
+    const period = 21;
+    const multiplier = 2 / (period + 1);
+
+    let emaHigh = bars.slice(0, period).reduce((sum, b) => sum + b.high, 0) / period;
+    let emaClose = bars.slice(0, period).reduce((sum, b) => sum + b.close, 0) / period;
+    let emaLow = bars.slice(0, period).reduce((sum, b) => sum + b.low, 0) / period;
+
+    for (let i = period; i < bars.length; i++) {
+      emaHigh = (bars[i].high - emaHigh) * multiplier + emaHigh;
+      emaClose = (bars[i].close - emaClose) * multiplier + emaClose;
+      emaLow = (bars[i].low - emaLow) * multiplier + emaLow;
+    }
+
+    return { maHigh: emaHigh, maClose: emaClose, maLow: emaLow };
+  }
+
+  /**
+   * Calculate 14-period ATR
+   */
+  private calculateATR(bars: OHLC[], period: number = 14): number {
+    if (bars.length < period + 1) {
+      return 0;
+    }
+
+    const trueRanges: number[] = [];
+    for (let i = 1; i < bars.length; i++) {
+      const tr = Math.max(
+        bars[i].high - bars[i].low,
+        Math.abs(bars[i].high - bars[i - 1].close),
+        Math.abs(bars[i].low - bars[i - 1].close)
+      );
+      trueRanges.push(tr);
+    }
+
+    const recentTRs = trueRanges.slice(-period);
+    return recentTRs.reduce((sum, tr) => sum + tr, 0) / recentTRs.length;
   }
 
   /**

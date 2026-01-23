@@ -716,6 +716,16 @@ export class ReplayEngine {
    */
   async initialize(): Promise<void> {
     await this.loader.preload();
+
+    // Get all tickers from universe + Discord trades
+    const universeTickers = this.loader.getUniverseTickers(this.loader.getDateRange()[0]);
+    console.log(`[ReplayEngine] Pre-fetching OHLC for ${universeTickers.length} tickers...`);
+
+    // Preload all OHLC data in one batch (dramatically faster)
+    await this.loader.preloadOHLC(universeTickers, (completed, total, ticker) => {
+      process.stdout.write(`\r  Pre-fetching OHLC: ${completed}/${total} (${((completed / total) * 100).toFixed(1)}%)`);
+    });
+    console.log(); // New line after progress
   }
 
   /**
