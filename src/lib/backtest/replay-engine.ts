@@ -910,6 +910,14 @@ export class ReplayEngine {
 // Exports
 // =============================================================================
 
+export {
+  generateCandidates,
+  rankCandidates,
+  sizePosition,
+  calculateIBDReturns,
+  calculateIBDRating,
+};
+
 export default {
   ReplayEngine,
   generateCandidates,
