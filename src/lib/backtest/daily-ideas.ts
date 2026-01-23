@@ -403,13 +403,61 @@ function formatIdeas(ideas: TradeIdea[], date: string, equity: number = 100000):
 
       lines.push("│" + " ".repeat(width - 2) + "│");
     }
+
+    // Portfolio Summary
+    lines.push("├" + "─".repeat(width - 2) + "┤");
+    lines.push("│" + "  PORTFOLIO SUMMARY".padEnd(width - 2) + "│");
+    lines.push("├" + "─".repeat(width - 2) + "┤");
+
+    const totalEntryDollars = ideas.reduce((s, i) => s + i.entry.dollars, 0);
+    const totalEntryPct = ideas.reduce((s, i) => s + i.entry.portfolioPct, 0);
+    const totalEntryRisk = ideas.reduce((s, i) => s + i.entry.riskPct, 0);
+
+    const totalAddDollars = ideas.reduce((s, i) => s + i.add.dollars, 0);
+    const totalAddPct = ideas.reduce((s, i) => s + i.add.portfolioPct, 0);
+    const totalAddRisk = ideas.reduce((s, i) => s + i.add.riskPct, 0);
+
+    const totalWithAddsDollars = totalEntryDollars + totalAddDollars;
+    const totalWithAddsPct = totalEntryPct + totalAddPct;
+    const totalWithAddsRisk = totalEntryRisk + totalAddRisk;
+
+    // Entry totals
+    const entryTotal = `  All Entries:    $${totalEntryDollars.toLocaleString()}  (${totalEntryPct.toFixed(1)}% of portfolio)`;
+    lines.push("│" + entryTotal.padEnd(width - 2) + "│");
+    const entryRiskLine = `                  Risk: ${totalEntryRisk.toFixed(2)}% NER`;
+    lines.push("│" + entryRiskLine.padEnd(width - 2) + "│");
+
+    // With adds totals
+    const withAddsTotal = `  + All Adds:     $${totalWithAddsDollars.toLocaleString()}  (${totalWithAddsPct.toFixed(1)}% of portfolio)`;
+    lines.push("│" + withAddsTotal.padEnd(width - 2) + "│");
+    const withAddsRiskLine = `                  Risk: ${totalWithAddsRisk.toFixed(2)}% NER`;
+    lines.push("│" + withAddsRiskLine.padEnd(width - 2) + "│");
+
+    // Cash remaining
+    const cashAfterEntries = equity - totalEntryDollars;
+    const cashAfterAll = equity - totalWithAddsDollars;
+    lines.push("│" + " ".repeat(width - 2) + "│");
+    const cashLine1 = `  Cash after entries: $${Math.max(0, cashAfterEntries).toLocaleString()}  (${Math.max(0, (100 - totalEntryPct)).toFixed(1)}%)`;
+    lines.push("│" + cashLine1.padEnd(width - 2) + "│");
+    const cashLine2 = `  Cash after all:     $${Math.max(0, cashAfterAll).toLocaleString()}  (${Math.max(0, (100 - totalWithAddsPct)).toFixed(1)}%)`;
+    lines.push("│" + cashLine2.padEnd(width - 2) + "│");
+
+    // Warning if over 100%
+    if (totalEntryPct > 100) {
+      lines.push("│" + " ".repeat(width - 2) + "│");
+      lines.push("│" + "  ⚠️  ENTRIES EXCEED 100% - Select fewer positions or reduce sizes".padEnd(width - 2) + "│");
+    } else if (totalWithAddsPct > 100) {
+      lines.push("│" + " ".repeat(width - 2) + "│");
+      lines.push("│" + "  ⚠️  ENTRIES + ADDS EXCEED 100% - Prioritize best setups for adds".padEnd(width - 2) + "│");
+    }
   }
 
   // Footer
   lines.push("├" + "─".repeat(width - 2) + "┤");
   lines.push("│" + "  Filters: Grade A/B | RS >= 70 | Prefer contraction".padEnd(width - 2) + "│");
+  const avgNER = ideas.length > 0 ? (ideas.reduce((s, i) => s + i.entry.riskPct, 0) / ideas.length).toFixed(2) : "0.35";
   const sizingInfo = ideas.length > 0 && ideas[0].sizingMethod === "ATR"
-    ? "  Sizing: ATR-based | Target NER: 0.35% | Stop: 1.5×ATR | Max: 15%"
+    ? `  Sizing: ATR-based | Avg NER: ${avgNER}% | Stop: 1.5×ATR | Max: 15%`
     : "  Sizing: Fixed % | MODE1=11%, MODE2=13% | Add=1/2 entry";
   lines.push("│" + sizingInfo.padEnd(width - 2) + "│");
   lines.push("│" + "  Backtest: 54% WR, +0.30R expectancy, 1.39 PF".padEnd(width - 2) + "│");
