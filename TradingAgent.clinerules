@@ -1,0 +1,184 @@
+# Trading Agent - Liquid Leaders Strategy
+
+## Project Overview
+Systematic trading agent for Nasdaq-100 liquid leaders using breadth confirmation.
+EOD (end-of-day) decisions on daily timeframe. Long-only, pullback entries into 21EMA structure.
+
+## Core Documentation (READ THESE FIRST)
+- **agent_skeleton_v1_0.md** - Master specification (frozen v1.0, 2026-01-17)
+  - Section 0: Global Invariants (never violate)
+  - Section 1-7: Trading rules (market states, structure, entry modes, stops, risk)
+- **agent_tasks.md** - Task definitions (Tasks 1-9) with state machine diagram
+- **agent_ui_contract.md** - Dashboard UI specifications (6 panels)
+
+## Before Writing Code
+- Check **docs/BUGS.md** for known issues and prevention patterns
+- Check **docs/TESTS.md** for test patterns to follow
+- Write tests before or alongside new features
+
+## Tech Stack
+- Next.js 14 (App Router)
+- TypeScript (strict mode)
+- React 18
+- Supabase (database + realtime subscriptions)
+- Tailwind CSS + shadcn/ui
+- Recharts (price charts, breadth indicators)
+- Decimal.js (ALL price/position/money calculations - mandatory)
+
+## Critical Rules from agent_skeleton_v1_0.md
+1. Market-first: No market confirmation → no portfolio risk
+2. Long-only (NEVER short)
+3. Daily timeframe only (EOD discipline)
+4. All decisions on daily close (except max pain override)
+5. All calculations use Decimal.js (no floating point for $)
+6. No breakout chasing - only pullback entries
+7. Structure overrides narrative
+8. Risk defined before entry (SSL + max loss)
+9. No positions if earnings < 7 days
+
+## Data Requirements
+- QQQE daily price data
+- Nasdaq-100 McClellan Oscillator (MCO) + z-score
+- Nasdaq-100 McClellan Summation Index (MCSI) + z-score + 10DMA
+- Individual ticker daily data for liquid leaders universe
+- 21EMA calculations: MAHigh = 21EMA(high), MAClose = 21EMA(close), MALow = 21EMA(low)
+
+## Code Structure (Maps to agent_tasks.md)
+/src
+  /tasks
+    - market-analysis.ts       (Task 1: QQQE structure + MCO/MCSI breadth)
+    - universe-scan.ts          (Task 2: Liquid leaders 30-40)
+    - pullback-scan.ts          (Task 3: Pullback candidates 5-10)
+    - entry-readiness.ts        (Task 4: READY check, assign MODE1/MODE2)
+    - focus-list-ranking.ts     (Task 5: Top 5 + optional 1 manual promotion)
+    - position-sizing.ts        (Task 6: Size + risk gate)
+    - execution-plan.ts         (Task 7: Advisory order tickets)
+    - portfolio.ts              (Task 8: Positions + aggregates)
+    - overview.ts               (Task 9: Navigation + trades today)
+  /types
+    - market-state.ts           (TypeScript types matching YAML outputs)
+    - trades.ts
+    - portfolio.ts
+  /lib
+    - calculations/             (21EMA, MCO, MCSI, position sizing - all use Decimal.js)
+  /views                        (Dashboard components - see agent_ui_contract.md)
+    - market-state-panel.tsx
+    - liquid-leaders-panel.tsx
+    - pullback-scan-panel.tsx
+    - focus-list-panel.tsx
+    - trades-today-panel.tsx
+    - portfolio-panel.tsx
+
+## TypeScript Types (Match YAML Outputs)
+All outputs from agent_tasks.md must have corresponding TypeScript interfaces.
+Example: Task 1 output → MarketStateOutput interface
+
+## Decimal.js Usage (MANDATORY)
+- Import: `import Decimal from 'decimal.js'`
+- All price calculations: `new Decimal(price)`
+- All position sizing: `new Decimal(equity).times(positionPercent)`
+- All R calculations: `entry.minus(ssl)`
+- Convert to display: `.toFixed(2)` or `.toNumber()` only for UI
+
+## State Machine Flow (from agent_tasks.md)
+MarketState → UniverseScan → PullbackScan → Readiness → FocusList → Sizing → Execution → Portfolio → (loop)
+
+## Development Patterns
+- Each Task (1-9) is a separate module
+- YAML outputs → TypeScript types
+- UI panels (agent_ui_contract.md) consume task outputs
+- EOD refresh triggers task pipeline
+- All market states use enums (no magic strings)
+- Entry modes: MODE1 | MODE2 (constants)
+
+## When Asking Claude Code for Help
+Always reference the specific documentation:
+- "Following agent_skeleton_v1_0.md Section 2.1, implement the 21EMA structure calculation"
+- "Using agent_tasks.md Task 4, create the entry readiness module"
+- "Per agent_ui_contract.md Panel 4, build the Focus List component"
+```
+
+---
+
+### 2. **How to Prompt Claude Code**
+
+#### ✅ GOOD Prompts (Reference Your Docs)
+```
+"Read agent_skeleton_v1_0.md and agent_tasks.md. 
+Create TypeScript types for all 9 task outputs."
+```
+```
+"Following agent_tasks.md Task 1, implement the market 
+analysis module that calculates 21EMA structure and emits 
+the MarketStateOutput."
+```
+```
+"Per agent_ui_contract.md Panel 1, create the Market State 
+dashboard component showing state label, metrics table, 
+and permissions strip."
+```
+```
+"Using agent_skeleton_v1_0.md Section 6 (Risk & Sizing), 
+implement the position sizing function with Decimal.js. 
+It should output the format from agent_tasks.md Task 6."
+```
+
+#### ❌ BAD Prompts (Too Vague)
+```
+"Build the trading dashboard"  ← Which panel? Which spec?
+```
+```
+"Calculate position size"  ← Which mode? Which rules?
+```
+
+---
+
+### 3. **Your Workflow**
+
+**Step 1: Start with Types**
+```
+"Read agent_tasks.md. Create TypeScript interfaces for 
+all 9 task YAML outputs in /src/types/"
+```
+
+**Step 2: Build Task Modules (One at a Time)**
+```
+"Following agent_tasks.md Task 1, implement market-analysis.ts 
+that returns a MarketStateOutput. Use the rules from 
+agent_skeleton_v1_0.md Section 1-2."
+```
+
+**Step 3: Build UI Components**
+```
+"Per agent_ui_contract.md Panel 1, create market-state-panel.tsx 
+that displays the MarketStateOutput from Task 1."
+```
+
+**Step 4: Connect the Pipeline**
+```
+"Using the state machine diagram in agent_tasks.md, create 
+the main task orchestrator that runs Tasks 1-9 in sequence."
+```
+
+---
+
+### 4. **What Makes Your Setup Great**
+
+✅ **Frozen specs** - v1.0 means no ambiguity
+✅ **YAML outputs** - Easy to convert to TypeScript types
+✅ **Clear task boundaries** - Each task is independent
+✅ **UI contract** - Exact layout specifications
+✅ **Rules locked** - No interpretation needed
+
+---
+
+### 5. **Quick Reference Card for Claude Code**
+
+When you want Claude Code to work on something, use this pattern:
+```
+"[Action] following [specific document] [specific section]"
+
+Examples:
+- "Implement Task 3 following agent_tasks.md"
+- "Create Panel 4 following agent_ui_contract.md"
+- "Apply the risk rules from agent_skeleton_v1_0.md Section 6"
