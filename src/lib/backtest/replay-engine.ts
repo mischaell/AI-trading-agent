@@ -53,61 +53,97 @@ const DEFAULT_REPLAY_OPTIONS: ReplayOptions = {
 };
 
 // =============================================================================
-// RS Calculation
+// IBD-Style RS Rating Calculation
 // =============================================================================
 
 interface RSData {
   ticker: string;
-  rs: number;
-  return3m: number;
-  return6m: number;
-  return12m: number;
+  rs: number; // IBD-style 1-99 rating
+  returnQ1: number; // Most recent quarter (0-3 months)
+  returnQ2: number; // 3-6 months ago
+  returnQ3: number; // 6-9 months ago
+  returnQ4: number; // 9-12 months ago
+  weightedReturn: number;
 }
 
 /**
- * Calculate relative strength for a ticker
+ * Calculate IBD-style Relative Strength Rating
+ *
+ * IBD RS Rating methodology:
+ * - Measures price performance over the past 12 months
+ * - Weights recent performance more heavily:
+ *   - Q1 (most recent 3 months): 40% weight
+ *   - Q2 (3-6 months ago): 20% weight
+ *   - Q3 (6-9 months ago): 20% weight
+ *   - Q4 (9-12 months ago): 20% weight
+ * - Ranks all stocks on 1-99 scale (99 = top 1%, 50 = average)
  */
-function calculateRS(bars: { date: string; close: number }[]): {
-  return3m: number;
-  return6m: number;
-  return12m: number;
-  weighted: number;
+function calculateIBDReturns(bars: { date: string; close: number }[]): {
+  returnQ1: number;
+  returnQ2: number;
+  returnQ3: number;
+  returnQ4: number;
+  weightedReturn: number;
 } {
   if (bars.length < 21) {
-    return { return3m: 0, return6m: 0, return12m: 0, weighted: 0 };
+    return { returnQ1: 0, returnQ2: 0, returnQ3: 0, returnQ4: 0, weightedReturn: 0 };
   }
 
   const latestClose = bars[bars.length - 1].close;
 
-  // Find closes at different lookback periods
-  const close3m = bars.length >= 63 ? bars[bars.length - 63]?.close : bars[0].close;
-  const close6m = bars.length >= 126 ? bars[bars.length - 126]?.close : bars[0].close;
-  const close12m = bars.length >= 252 ? bars[bars.length - 252]?.close : bars[0].close;
+  // Find closes at quarter boundaries (approximately 63 trading days per quarter)
+  const getClose = (daysBack: number) => {
+    const idx = bars.length - daysBack;
+    return idx >= 0 ? bars[idx]?.close : bars[0]?.close;
+  };
 
-  const return3m = close3m ? ((latestClose - close3m) / close3m) * 100 : 0;
-  const return6m = close6m ? ((latestClose - close6m) / close6m) * 100 : 0;
-  const return12m = close12m ? ((latestClose - close12m) / close12m) * 100 : 0;
+  const close3m = getClose(63);   // 3 months ago
+  const close6m = getClose(126);  // 6 months ago
+  const close9m = getClose(189);  // 9 months ago
+  const close12m = getClose(252); // 12 months ago
 
-  // Weighted average: 40% 3M, 35% 6M, 25% 12M
-  const weighted = return3m * 0.4 + return6m * 0.35 + return12m * 0.25;
+  // Calculate quarterly returns
+  // Q1: return from 3 months ago to now
+  const returnQ1 = close3m ? ((latestClose - close3m) / close3m) * 100 : 0;
+  // Q2: return from 6 months ago to 3 months ago
+  const returnQ2 = close6m && close3m ? ((close3m - close6m) / close6m) * 100 : 0;
+  // Q3: return from 9 months ago to 6 months ago
+  const returnQ3 = close9m && close6m ? ((close6m - close9m) / close9m) * 100 : 0;
+  // Q4: return from 12 months ago to 9 months ago
+  const returnQ4 = close12m && close9m ? ((close9m - close12m) / close12m) * 100 : 0;
 
-  return { return3m, return6m, return12m, weighted };
+  // IBD weighting: 40% Q1, 20% Q2, 20% Q3, 20% Q4
+  const weightedReturn = (returnQ1 * 0.40) + (returnQ2 * 0.20) + (returnQ3 * 0.20) + (returnQ4 * 0.20);
+
+  return { returnQ1, returnQ2, returnQ3, returnQ4, weightedReturn };
 }
 
 /**
- * Calculate RS percentile rank
+ * Calculate IBD-style RS Rating (1-99 scale)
+ *
+ * @param tickers - Array of tickers with their weighted returns
+ * @returns Map of ticker to RS Rating (1-99)
  */
-function calculateRSPercentile(tickers: RSData[]): Map<string, number> {
-  const sorted = [...tickers].sort((a, b) => b.rs - a.rs);
-  const percentiles = new Map<string, number>();
+function calculateIBDRating(tickers: RSData[]): Map<string, number> {
+  // Sort by weighted return (highest first)
+  const sorted = [...tickers].sort((a, b) => b.weightedReturn - a.weightedReturn);
+  const ratings = new Map<string, number>();
 
+  // Convert rank to 1-99 scale
+  // Rank 1 = RS 99, Rank at 50% = RS 50, Last = RS 1
   for (let i = 0; i < sorted.length; i++) {
-    const percentile = Math.round(((sorted.length - i) / sorted.length) * 100);
-    percentiles.set(sorted[i].ticker, percentile);
+    // Calculate percentile (0-100), then convert to 1-99 IBD scale
+    const percentile = ((sorted.length - i) / sorted.length) * 100;
+    // IBD RS is 1-99, with 99 being the best
+    const rsRating = Math.max(1, Math.min(99, Math.round(percentile)));
+    ratings.set(sorted[i].ticker, rsRating);
   }
 
-  return percentiles;
+  return ratings;
 }
+
+// Keep old function name as alias for compatibility
+const calculateRSPercentile = calculateIBDRating;
 
 // =============================================================================
 // Candidate Generation
@@ -237,27 +273,35 @@ async function generateCandidates(
     const stockData = await loader.getStockData(ticker, date);
     if (!stockData || stockData.bars.length < 21) continue;
 
-    const rs = calculateRS(stockData.bars);
+    const rs = calculateIBDReturns(stockData.bars);
     rsData.push({
       ticker,
-      rs: rs.weighted,
-      return3m: rs.return3m,
-      return6m: rs.return6m,
-      return12m: rs.return12m,
+      rs: 0, // Will be filled by calculateIBDRating
+      returnQ1: rs.returnQ1,
+      returnQ2: rs.returnQ2,
+      returnQ3: rs.returnQ3,
+      returnQ4: rs.returnQ4,
+      weightedReturn: rs.weightedReturn,
     });
   }
 
-  // Calculate RS percentiles
-  const rsPercentiles = calculateRSPercentile(rsData);
+  // Calculate IBD-style RS Ratings (1-99 scale)
+  const rsRatings = calculateIBDRating(rsData);
 
-  // Filter candidates:
-  // - Discord tickers: RS >= 30 (relaxed to improve matching)
+  // Update rsData with ratings
+  for (const data of rsData) {
+    data.rs = rsRatings.get(data.ticker) || 0;
+  }
+
+  // Filter candidates by IBD RS Rating:
+  // - Discord tickers: RS >= 25 (relaxed to improve matching)
   // - Other tickers: RS >= 70 (strict liquid leaders filter)
+  // Note: IBD RS is 1-99 scale where 99 = top 1%, 70 = top 30%
   const discordTickers = new Set(loader.getDiscordTickers());
   const liquidLeaders = rsData.filter((r) => {
-    const rsPercentile = rsPercentiles.get(r.ticker) || 0;
+    const rsRating = rsRatings.get(r.ticker) || 0;
     const isDiscord = discordTickers.has(r.ticker);
-    return isDiscord ? rsPercentile >= 30 : rsPercentile >= 70;
+    return isDiscord ? rsRating >= 25 : rsRating >= 70;
   });
 
   // Generate candidates for each qualified ticker
@@ -311,8 +355,8 @@ async function generateCandidates(
     candidates.push({
       ticker: leader.ticker,
       date,
-      rs_rank: leader.rs,
-      rs_percentile: rsPercentiles.get(leader.ticker) || 0,
+      rs_rank: leader.weightedReturn, // IBD weighted return for sorting
+      rs_percentile: rsRatings.get(leader.ticker) || 0, // IBD RS Rating (1-99)
       grade,
       mode,
       setup_type: setupType,
@@ -861,5 +905,6 @@ export default {
   generateCandidates,
   rankCandidates,
   sizePosition,
-  calculateRS,
+  calculateIBDReturns,
+  calculateIBDRating,
 };
