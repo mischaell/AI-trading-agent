@@ -33,6 +33,7 @@ interface FilterConfig {
   minRsRating: number;         // Minimum IBD RS Rating (1-99)
   preferContraction: boolean;  // Boost contraction setups
   maxIdeas: number;            // Limit output
+  equity: number;              // Account equity for position sizing
 }
 
 const DEFAULT_FILTER: FilterConfig = {
@@ -40,6 +41,7 @@ const DEFAULT_FILTER: FilterConfig = {
   minRsRating: 70,
   preferContraction: true,
   maxIdeas: 5,
+  equity: 100000,              // Default $100k account
 };
 
 // =============================================================================
@@ -56,6 +58,14 @@ import {
 // Trade Idea Type
 // =============================================================================
 
+interface PositionSize {
+  shares: number;
+  dollars: number;
+  portfolioPct: number;     // % of portfolio
+  riskDollars: number;      // Total $ at risk (shares × R per share)
+  riskPct: number;          // NER - New Equity Risk %
+}
+
 interface TradeIdea {
   rank: number;
   ticker: string;
@@ -68,7 +78,12 @@ interface TradeIdea {
   entryPrice: number;
   stopLoss: number;       // 21EMA Low (SSL)
   target2R: number;       // 2R profit target
-  riskPercent: number;    // Risk per share as %
+  target3R: number;       // 3R profit target
+  rPerShare: number;      // Risk per share in $
+
+  // Position Sizing
+  entry: PositionSize;    // Full entry position
+  add: PositionSize;      // Add position (1/2 size)
 
   // Setup details
   setupType: string;
@@ -167,15 +182,36 @@ async function generateDailyIdeas(
     return scoreB - scoreA;
   });
 
-  // Convert to TradeIdea format
+  // Convert to TradeIdea format with position sizing
   const ideas: TradeIdea[] = [];
+  const equity = filter.equity;
 
   for (let i = 0; i < Math.min(sorted.length, filter.maxIdeas); i++) {
     const { candidate, score } = sorted[i];
 
-    // Calculate 2R target (no need for full position sizing here)
-    const riskPerShare = candidate.close - candidate.ma_low;
-    const target2R = candidate.close + (riskPerShare * 2);
+    // Calculate R per share (risk)
+    const rPerShare = candidate.close - candidate.ma_low;
+    const target2R = candidate.close + (rPerShare * 2);
+    const target3R = candidate.close + (rPerShare * 3);
+
+    // Position sizing for ENTRY
+    // MODE1 (Weakness): 11% of equity
+    // MODE2 (Reclaim): 13% of equity
+    const entryPct = candidate.mode === "MODE2" ? 0.13 : 0.11;
+    const entryDollars = equity * entryPct;
+    const entryShares = Math.floor(entryDollars / candidate.close);
+    const actualEntryDollars = entryShares * candidate.close;
+    const entryRiskDollars = entryShares * rPerShare;
+    const entryNER = (entryRiskDollars / equity) * 100;
+
+    // Position sizing for ADD
+    // Adds are typically 1/2 the entry size (5.5-6.5% of equity)
+    const addPct = entryPct / 2;
+    const addDollars = equity * addPct;
+    const addShares = Math.floor(addDollars / candidate.close);
+    const actualAddDollars = addShares * candidate.close;
+    const addRiskDollars = addShares * rPerShare;
+    const addNER = (addRiskDollars / equity) * 100;
 
     ideas.push({
       rank: i + 1,
@@ -188,7 +224,26 @@ async function generateDailyIdeas(
       entryPrice: round2(candidate.close),
       stopLoss: round2(candidate.ma_low),
       target2R: round2(target2R),
-      riskPercent: round2((riskPerShare / candidate.close) * 100),
+      target3R: round2(target3R),
+      rPerShare: round2(rPerShare),
+
+      // Entry position
+      entry: {
+        shares: entryShares,
+        dollars: round2(actualEntryDollars),
+        portfolioPct: round2(entryPct * 100),
+        riskDollars: round2(entryRiskDollars),
+        riskPct: round2(entryNER),
+      },
+
+      // Add position
+      add: {
+        shares: addShares,
+        dollars: round2(actualAddDollars),
+        portfolioPct: round2(addPct * 100),
+        riskDollars: round2(addRiskDollars),
+        riskPct: round2(addNER),
+      },
 
       setupType: candidate.setup_type,
       hasContraction: candidate.contraction,
@@ -213,13 +268,14 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function formatIdeas(ideas: TradeIdea[], date: string): string {
+function formatIdeas(ideas: TradeIdea[], date: string, equity: number = 100000): string {
   const lines: string[] = [];
-  const width = 70;
+  const width = 78;
 
   // Header
   lines.push("┌" + "─".repeat(width - 2) + "┐");
   lines.push("│" + `  DAILY TRADE IDEAS - ${date}`.padEnd(width - 2) + "│");
+  lines.push("│" + `  Account: $${equity.toLocaleString()}`.padEnd(width - 2) + "│");
 
   if (ideas.length > 0) {
     const market = ideas[0].marketState.replace(/_/g, " ");
@@ -240,17 +296,31 @@ function formatIdeas(ideas: TradeIdea[], date: string): string {
       lines.push("│" + mainLine.padEnd(width - 2) + "│");
 
       // Price line
-      const priceLine = `      Entry: $${idea.entryPrice.toFixed(2)}   Stop: $${idea.stopLoss.toFixed(2)}   Target 2R: $${idea.target2R.toFixed(2)}`;
+      const priceLine = `      Entry: $${idea.entryPrice.toFixed(2)}   Stop: $${idea.stopLoss.toFixed(2)}   R: $${idea.rPerShare.toFixed(2)}`;
       lines.push("│" + priceLine.padEnd(width - 2) + "│");
+
+      // Targets line
+      const targetLine = `      Target 2R: $${idea.target2R.toFixed(2)}   Target 3R: $${idea.target3R.toFixed(2)}`;
+      lines.push("│" + targetLine.padEnd(width - 2) + "│");
 
       // Setup line (avoid duplicate "contraction" if already in setupType)
       const contraction = idea.hasContraction && !idea.setupType.includes("contraction") ? " + contraction" : "";
       const setupLine = `      Setup: ${idea.setupType}${contraction}`;
       lines.push("│" + setupLine.padEnd(width - 2) + "│");
 
-      // Risk info
-      const riskLine = `      Risk: ${idea.riskPercent.toFixed(1)}% | Dist to 21EMA: ${idea.distToEMA.toFixed(2)} ATR`;
-      lines.push("│" + riskLine.padEnd(width - 2) + "│");
+      // Entry position sizing
+      lines.push("│" + "      ─── ENTRY ───".padEnd(width - 2) + "│");
+      const entryLine1 = `      Shares: ${idea.entry.shares}   Position: $${idea.entry.dollars.toLocaleString()} (${idea.entry.portfolioPct}%)`;
+      lines.push("│" + entryLine1.padEnd(width - 2) + "│");
+      const entryLine2 = `      Risk: $${idea.entry.riskDollars.toFixed(0)} (${idea.entry.riskPct.toFixed(2)}% NER)`;
+      lines.push("│" + entryLine2.padEnd(width - 2) + "│");
+
+      // Add position sizing
+      lines.push("│" + "      ─── ADD ───".padEnd(width - 2) + "│");
+      const addLine1 = `      Shares: ${idea.add.shares}   Position: $${idea.add.dollars.toLocaleString()} (${idea.add.portfolioPct}%)`;
+      lines.push("│" + addLine1.padEnd(width - 2) + "│");
+      const addLine2 = `      Risk: $${idea.add.riskDollars.toFixed(0)} (${idea.add.riskPct.toFixed(2)}% NER)`;
+      lines.push("│" + addLine2.padEnd(width - 2) + "│");
 
       lines.push("│" + " ".repeat(width - 2) + "│");
     }
@@ -259,7 +329,8 @@ function formatIdeas(ideas: TradeIdea[], date: string): string {
   // Footer
   lines.push("├" + "─".repeat(width - 2) + "┤");
   lines.push("│" + "  Filters: Grade A/B | RS >= 70 | Prefer contraction".padEnd(width - 2) + "│");
-  lines.push("│" + "  Based on backtest: 54% WR, +0.30R expectancy, 1.39 PF".padEnd(width - 2) + "│");
+  lines.push("│" + "  Position: MODE1=11%, MODE2=13% | Add=1/2 entry size".padEnd(width - 2) + "│");
+  lines.push("│" + "  Backtest: 54% WR, +0.30R expectancy, 1.39 PF".padEnd(width - 2) + "│");
   lines.push("└" + "─".repeat(width - 2) + "┘");
 
   return lines.join("\n");
@@ -276,21 +347,33 @@ function formatJSON(ideas: TradeIdea[]): string {
 async function main() {
   const args = process.argv.slice(2);
   const date = args[0] || new Date().toISOString().split("T")[0];
-  const format = args[1] || "pretty"; // "pretty" or "json"
+  const equityArg = args[1] ? parseInt(args[1], 10) : 100000;
+  const format = args[2] || "pretty"; // "pretty" or "json"
 
-  console.log("═".repeat(70));
-  console.log("                    DAILY TRADE IDEAS GENERATOR");
-  console.log("═".repeat(70));
+  const equity = isNaN(equityArg) ? 100000 : equityArg;
+
+  console.log("═".repeat(78));
+  console.log("                       DAILY TRADE IDEAS GENERATOR");
+  console.log("═".repeat(78));
+  console.log();
+  console.log(`Usage: npx tsx daily-ideas.ts [date] [equity] [format]`);
+  console.log(`       date:   YYYY-MM-DD (default: today)`);
+  console.log(`       equity: Account size in $ (default: 100000)`);
+  console.log(`       format: 'pretty' or 'json' (default: pretty)`);
   console.log();
 
   try {
-    const ideas = await generateDailyIdeas(date);
+    const filter: FilterConfig = {
+      ...DEFAULT_FILTER,
+      equity,
+    };
+    const ideas = await generateDailyIdeas(date, filter);
 
     console.log();
     if (format === "json") {
       console.log(formatJSON(ideas));
     } else {
-      console.log(formatIdeas(ideas, date));
+      console.log(formatIdeas(ideas, date, equity));
     }
 
     // Summary
@@ -300,7 +383,9 @@ async function main() {
     if (ideas.length > 0) {
       const avgScore = ideas.reduce((s, i) => s + i.score, 0) / ideas.length;
       const avgRS = ideas.reduce((s, i) => s + i.rsRating, 0) / ideas.length;
+      const totalEntryRisk = ideas.reduce((s, i) => s + i.entry.riskPct, 0);
       console.log(`Average Score: ${avgScore.toFixed(1)} | Average RS: ${avgRS.toFixed(1)}`);
+      console.log(`Total Entry Risk (all ideas): ${totalEntryRisk.toFixed(2)}% NER`);
     }
 
   } catch (error) {
@@ -318,6 +403,7 @@ export {
   formatIdeas,
   formatJSON,
   TradeIdea,
+  PositionSize,
   FilterConfig,
   DEFAULT_FILTER,
 };
