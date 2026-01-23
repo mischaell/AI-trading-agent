@@ -34,6 +34,12 @@ interface FilterConfig {
   preferContraction: boolean;  // Boost contraction setups
   maxIdeas: number;            // Limit output
   equity: number;              // Account equity for position sizing
+
+  // ATR-based position sizing
+  targetNER: number;           // Target New Equity Risk % per trade (e.g., 0.35)
+  atrMultiplier: number;       // ATR multiplier for stop (e.g., 1.5)
+  maxPositionPct: number;      // Max position size as % of equity (e.g., 15)
+  useATRSizing: boolean;       // Enable ATR-based sizing (vs fixed %)
 }
 
 const DEFAULT_FILTER: FilterConfig = {
@@ -42,6 +48,12 @@ const DEFAULT_FILTER: FilterConfig = {
   preferContraction: true,
   maxIdeas: 5,
   equity: 100000,              // Default $100k account
+
+  // ATR-based position sizing (balanced risk/return)
+  targetNER: 0.35,             // 0.35% risk per trade
+  atrMultiplier: 1.5,          // Stop at 1.5 ATR below entry
+  maxPositionPct: 15,          // Cap at 15% of equity
+  useATRSizing: true,          // Enable by default
 };
 
 // =============================================================================
@@ -76,10 +88,13 @@ interface TradeIdea {
 
   // Prices
   entryPrice: number;
-  stopLoss: number;       // 21EMA Low (SSL)
+  stopLoss: number;       // ATR-based stop (or 21EMA Low if tighter)
+  stopATR: number;        // Stop based on ATR multiplier
+  stop21EMA: number;      // Stop based on 21EMA Low
   target2R: number;       // 2R profit target
   target3R: number;       // 3R profit target
   rPerShare: number;      // Risk per share in $
+  atr: number;            // 14-period ATR
 
   // Position Sizing
   entry: PositionSize;    // Full entry position
@@ -96,6 +111,9 @@ interface TradeIdea {
     newEntries: boolean;
     adds: boolean;
   };
+
+  // Sizing method used
+  sizingMethod: "ATR" | "FIXED";
 }
 
 // =============================================================================
@@ -189,29 +207,75 @@ async function generateDailyIdeas(
   for (let i = 0; i < Math.min(sorted.length, filter.maxIdeas); i++) {
     const { candidate, score } = sorted[i];
 
+    // Get ATR from candidate
+    const atr = candidate.atr;
+
+    // Calculate stops
+    const stop21EMA = candidate.ma_low;                           // Traditional 21EMA Low stop
+    const stopATR = candidate.close - (atr * filter.atrMultiplier); // ATR-based stop
+
+    // Use ATR stop if enabled, otherwise 21EMA Low
+    // Take the tighter of the two for risk management
+    let stopLoss: number;
+    let sizingMethod: "ATR" | "FIXED";
+
+    if (filter.useATRSizing) {
+      // Use ATR-based stop (typically gives more room than 21EMA)
+      stopLoss = stopATR;
+      sizingMethod = "ATR";
+    } else {
+      stopLoss = stop21EMA;
+      sizingMethod = "FIXED";
+    }
+
+    // Ensure stop is below entry
+    if (stopLoss >= candidate.close) {
+      stopLoss = candidate.close * 0.95; // Fallback: 5% stop
+    }
+
     // Calculate R per share (risk)
-    const rPerShare = candidate.close - candidate.ma_low;
+    const rPerShare = candidate.close - stopLoss;
     const target2R = candidate.close + (rPerShare * 2);
     const target3R = candidate.close + (rPerShare * 3);
 
-    // Position sizing for ENTRY
-    // MODE1 (Weakness): 11% of equity
-    // MODE2 (Reclaim): 13% of equity
-    const entryPct = candidate.mode === "MODE2" ? 0.13 : 0.11;
-    const entryDollars = equity * entryPct;
-    const entryShares = Math.floor(entryDollars / candidate.close);
+    let entryShares: number;
+    let entryPct: number;
+
+    if (filter.useATRSizing) {
+      // ATR-based position sizing: Fixed NER approach
+      // Shares = (Equity × Target NER%) / R per share
+      const targetRiskDollars = equity * (filter.targetNER / 100);
+      entryShares = Math.floor(targetRiskDollars / rPerShare);
+
+      // Calculate actual position %
+      const entryDollars = entryShares * candidate.close;
+      entryPct = entryDollars / equity;
+
+      // Cap at max position size
+      if (entryPct > filter.maxPositionPct / 100) {
+        entryPct = filter.maxPositionPct / 100;
+        const cappedDollars = equity * entryPct;
+        entryShares = Math.floor(cappedDollars / candidate.close);
+      }
+    } else {
+      // Fixed % position sizing (original method)
+      // MODE1 (Weakness): 11% of equity
+      // MODE2 (Reclaim): 13% of equity
+      entryPct = candidate.mode === "MODE2" ? 0.13 : 0.11;
+      const entryDollars = equity * entryPct;
+      entryShares = Math.floor(entryDollars / candidate.close);
+    }
+
     const actualEntryDollars = entryShares * candidate.close;
     const entryRiskDollars = entryShares * rPerShare;
     const entryNER = (entryRiskDollars / equity) * 100;
 
-    // Position sizing for ADD
-    // Adds are typically 1/2 the entry size (5.5-6.5% of equity)
-    const addPct = entryPct / 2;
-    const addDollars = equity * addPct;
-    const addShares = Math.floor(addDollars / candidate.close);
+    // Position sizing for ADD (1/2 of entry)
+    const addShares = Math.floor(entryShares / 2);
     const actualAddDollars = addShares * candidate.close;
     const addRiskDollars = addShares * rPerShare;
     const addNER = (addRiskDollars / equity) * 100;
+    const addPct = actualAddDollars / equity;
 
     ideas.push({
       rank: i + 1,
@@ -222,10 +286,13 @@ async function generateDailyIdeas(
       score: Math.round(score),
 
       entryPrice: round2(candidate.close),
-      stopLoss: round2(candidate.ma_low),
+      stopLoss: round2(stopLoss),
+      stopATR: round2(stopATR),
+      stop21EMA: round2(stop21EMA),
       target2R: round2(target2R),
       target3R: round2(target3R),
       rPerShare: round2(rPerShare),
+      atr: round2(atr),
 
       // Entry position
       entry: {
@@ -254,6 +321,8 @@ async function generateDailyIdeas(
         newEntries: context.permissions.new_entries,
         adds: context.permissions.adds,
       },
+
+      sizingMethod,
     });
   }
 
@@ -295,9 +364,19 @@ function formatIdeas(ideas: TradeIdea[], date: string, equity: number = 100000):
       const mainLine = `  #${idea.rank}  ${idea.ticker.padEnd(6)} Grade ${idea.grade}   ${idea.mode}   RS ${idea.rsRating}   Score ${idea.score}`;
       lines.push("│" + mainLine.padEnd(width - 2) + "│");
 
-      // Price line
-      const priceLine = `      Entry: $${idea.entryPrice.toFixed(2)}   Stop: $${idea.stopLoss.toFixed(2)}   R: $${idea.rPerShare.toFixed(2)}`;
+      // Price line with ATR info
+      const priceLine = `      Entry: $${idea.entryPrice.toFixed(2)}   ATR: $${idea.atr.toFixed(2)}`;
       lines.push("│" + priceLine.padEnd(width - 2) + "│");
+
+      // Stop line - show both stops
+      const stopLine = `      Stop: $${idea.stopLoss.toFixed(2)} (${idea.sizingMethod})   R: $${idea.rPerShare.toFixed(2)}`;
+      lines.push("│" + stopLine.padEnd(width - 2) + "│");
+
+      // Alternative stop reference
+      if (idea.sizingMethod === "ATR") {
+        const altStopLine = `      (21EMA: $${idea.stop21EMA.toFixed(2)}   ATR×1.5: $${idea.stopATR.toFixed(2)})`;
+        lines.push("│" + altStopLine.padEnd(width - 2) + "│");
+      }
 
       // Targets line
       const targetLine = `      Target 2R: $${idea.target2R.toFixed(2)}   Target 3R: $${idea.target3R.toFixed(2)}`;
@@ -310,14 +389,14 @@ function formatIdeas(ideas: TradeIdea[], date: string, equity: number = 100000):
 
       // Entry position sizing
       lines.push("│" + "      ─── ENTRY ───".padEnd(width - 2) + "│");
-      const entryLine1 = `      Shares: ${idea.entry.shares}   Position: $${idea.entry.dollars.toLocaleString()} (${idea.entry.portfolioPct}%)`;
+      const entryLine1 = `      Shares: ${idea.entry.shares}   Position: $${idea.entry.dollars.toLocaleString()} (${idea.entry.portfolioPct.toFixed(1)}%)`;
       lines.push("│" + entryLine1.padEnd(width - 2) + "│");
       const entryLine2 = `      Risk: $${idea.entry.riskDollars.toFixed(0)} (${idea.entry.riskPct.toFixed(2)}% NER)`;
       lines.push("│" + entryLine2.padEnd(width - 2) + "│");
 
       // Add position sizing
       lines.push("│" + "      ─── ADD ───".padEnd(width - 2) + "│");
-      const addLine1 = `      Shares: ${idea.add.shares}   Position: $${idea.add.dollars.toLocaleString()} (${idea.add.portfolioPct}%)`;
+      const addLine1 = `      Shares: ${idea.add.shares}   Position: $${idea.add.dollars.toLocaleString()} (${idea.add.portfolioPct.toFixed(1)}%)`;
       lines.push("│" + addLine1.padEnd(width - 2) + "│");
       const addLine2 = `      Risk: $${idea.add.riskDollars.toFixed(0)} (${idea.add.riskPct.toFixed(2)}% NER)`;
       lines.push("│" + addLine2.padEnd(width - 2) + "│");
@@ -329,7 +408,10 @@ function formatIdeas(ideas: TradeIdea[], date: string, equity: number = 100000):
   // Footer
   lines.push("├" + "─".repeat(width - 2) + "┤");
   lines.push("│" + "  Filters: Grade A/B | RS >= 70 | Prefer contraction".padEnd(width - 2) + "│");
-  lines.push("│" + "  Position: MODE1=11%, MODE2=13% | Add=1/2 entry size".padEnd(width - 2) + "│");
+  const sizingInfo = ideas.length > 0 && ideas[0].sizingMethod === "ATR"
+    ? "  Sizing: ATR-based | Target NER: 0.35% | Stop: 1.5×ATR | Max: 15%"
+    : "  Sizing: Fixed % | MODE1=11%, MODE2=13% | Add=1/2 entry";
+  lines.push("│" + sizingInfo.padEnd(width - 2) + "│");
   lines.push("│" + "  Backtest: 54% WR, +0.30R expectancy, 1.39 PF".padEnd(width - 2) + "│");
   lines.push("└" + "─".repeat(width - 2) + "┘");
 
