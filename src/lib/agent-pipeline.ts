@@ -208,6 +208,15 @@ interface UniverseDataItem {
   avgVolume: number;
   adrPct: number;
   liquidityM: number;
+  // New fields for expanded filters
+  volumeM?: number;           // Volume in millions of shares
+  marketCapB?: number;        // Market cap in billions
+  ema21?: number;             // 21-day EMA
+  ema21_prev?: number;        // Previous day 21-day EMA
+  is21EmaAdvancing?: boolean; // Whether 21EMA is rising
+  wma10?: number;             // 10-week MA (approx 50-day)
+  wma10_prev?: number;        // Previous 10-week MA
+  is10WmaAdvancing?: boolean; // Whether 10WMA is rising
 }
 
 interface StructureAnalysis {
@@ -1167,6 +1176,8 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     }
 
     // Build TickerData for universe scan
+    // Note: Using placeholder values here - actual data is fetched in Task 3
+    // TODO: Restructure pipeline to fetch universe data before universe scan for proper filtering
     const tickerDataForScan: TickerData[] = liquidLeaderTickers.map(ticker => {
       const rs = rsData.get(ticker);
       return {
@@ -1174,12 +1185,14 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
         rs: rs?.rs ?? 70,
         adr_pct: 3.0,
         liquidity_m: 500,
+        volume_m: 2.0,       // Placeholder - actual data fetched in Task 3
         price: 100,
+        market_cap_b: 10,    // Placeholder - actual data fetched in Task 3
         dist_21ema_atr: 0,
         earnings_days: 30,
         theme: TICKER_THEMES[ticker] || 'Unknown',
         is_china_adr: CHINA_ADRS.has(ticker),
-        is_defensive: isDefensive(TICKER_THEMES[ticker] || ''),
+        is_excluded_sector: isDefensive(TICKER_THEMES[ticker] || ''),
       };
     });
 
@@ -1281,6 +1294,9 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
         ema21_close: structure.ema21_close,
         ema21_low: structure.ema21_low,
         close: structure.close,
+        // Advancing EMA fields from universe data API
+        is_21ema_advancing: univItem?.is21EmaAdvancing,
+        is_10wma_advancing: univItem?.is10WmaAdvancing,
       });
     }
 
