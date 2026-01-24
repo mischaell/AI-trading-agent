@@ -417,13 +417,18 @@ export function calculatePortfolioSummary(
   let totalNer = new Decimal(0);
   let totalOpenHeat = new Decimal(0);
   let totalSecuredProfits = new Decimal(0);
+  let totalPositionValue = new Decimal(0);
 
   for (const pos of positions) {
     grossExposure = grossExposure.plus(pos.weight);
     totalNer = totalNer.plus(pos.ec_pct ?? 0);
     totalOpenHeat = totalOpenHeat.plus(pos.open_heat ?? 0);
     totalSecuredProfits = totalSecuredProfits.plus(pos.secured_pnl ?? 0);
+    totalPositionValue = totalPositionValue.plus(pos.value ?? 0);
   }
+
+  // Calculate cash dynamically: equity - total position value
+  const calculatedCash = equity.minus(totalPositionValue);
 
   return {
     gross_exposure: grossExposure.toNumber(),
@@ -431,7 +436,7 @@ export function calculatePortfolioSummary(
     open_heat: totalOpenHeat.toNumber(),
     secured_profits: totalSecuredProfits.toNumber(),
     equity: account.equity,
-    cash: account.cash,
+    cash: calculatedCash.toNumber(),
     position_count: positions.length,
   };
 }

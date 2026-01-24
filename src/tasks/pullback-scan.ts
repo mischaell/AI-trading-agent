@@ -122,17 +122,17 @@ interface PullbackFilterResult {
  * All Liquid Leaders filters plus pullback-specific criteria
  */
 export const DEFAULT_PULLBACK_CRITERIA: Required<PullbackFilterCriteria> = {
-  min_dist_21_atr: 0,           // 0 to 1 x ATR from 21EMA
-  max_dist_21_atr: 1.0,
-  min_dist_50_atr: -0.5,        // -0.5 to 4 x ATR from 50SMA
-  max_dist_50_atr: 4.0,
-  min_close_range_pct: 10,      // Daily closing range > 10%
-  require_contraction: true,    // Price contraction (last 5 days) - REQUIRED
-  max_weekly_return_pct: 15,    // Weekly return < 15%
-  min_earnings_days: 7,         // Earnings in 7+ days
-  require_advancing_21ema: true, // Advancing 21EMA
-  require_advancing_10wma: true, // Advancing 10WMA
-  target_count: { min: 5, max: 20 }, // Max 20 candidates (was 10)
+  min_dist_21_atr: -3.0,        // Widened: -3 to 4 x ATR from 21EMA
+  max_dist_21_atr: 4.0,
+  min_dist_50_atr: -5.0,        // Widened: removed as filter
+  max_dist_50_atr: 10.0,
+  min_close_range_pct: 0,       // Removed: any closing range OK
+  require_contraction: false,   // Removed: contraction not required
+  max_weekly_return_pct: 25,    // Widened: up to 25%
+  min_earnings_days: 7,         // Keep: Earnings in 7+ days
+  require_advancing_21ema: false, // Removed: not required
+  require_advancing_10wma: false, // Removed: not required
+  target_count: { min: 10, max: 30 }, // Target 10-30 candidates
 };
 
 /**

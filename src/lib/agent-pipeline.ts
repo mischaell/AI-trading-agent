@@ -355,11 +355,10 @@ const TICKER_THEMES: Record<string, string> = {
 };
 
 const PULLBACK_CRITERIA = {
-  min_dist_21_atr: -0.5,
-  max_dist_21_atr: 1.0,
-  min_dist_50_atr: 0,
-  max_dist_50_atr: 3.0,
-  max_weekly_return_pct: 12,
+  min_dist_21_atr: -3.0,   // Widened to capture deeper pullbacks
+  max_dist_21_atr: 4.0,    // Widened to include extended stocks
+  // dist_50 filter removed to maximize candidates
+  max_weekly_return_pct: 20, // Increased to allow more setups
 };
 
 // =============================================================================
@@ -1293,6 +1292,12 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     const universe = scanLiquidLeaders(tickerDataForScan);
     await notify('Task 2', 'complete', 25, `Found ${universe.count} liquid leaders from ${dailyScanResults.length} scanned`);
 
+    // Build rsData map from daily scan results for later use
+    const rsData = new Map<string, RSData>();
+    for (const stock of dailyScanResults) {
+      rsData.set(stock.ticker, { ticker: stock.ticker, rs: stock.rs, perf3m: 0, perf6m: 0 });
+    }
+
     // >>> PERSIST: Cache universe to Supabase (non-blocking)
     saveUniverseCache(universe, today).catch(e => console.error('[Pipeline] Universe cache error:', e));
 
@@ -1348,13 +1353,11 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       const univItem = universeItemData.get(ticker);
       if (!rs) continue;
 
-      // Apply pullback filters
+      // Apply pullback filters (dist_50 filter removed to maximize candidates)
       if (structure.dist_21ema_atr < PULLBACK_CRITERIA.min_dist_21_atr) continue;
       if (structure.dist_21ema_atr > PULLBACK_CRITERIA.max_dist_21_atr) continue;
-      if (structure.dist_50ema_atr < PULLBACK_CRITERIA.min_dist_50_atr) continue;
-      if (structure.dist_50ema_atr > PULLBACK_CRITERIA.max_dist_50_atr) continue;
       if (structure.weekly_return_pct > PULLBACK_CRITERIA.max_weekly_return_pct) continue;
-      if (!structure.structure_intact) continue;
+      // PASSED all filters
 
       const grade = calculateReadyGrade(
         structure.dist_21ema_atr,

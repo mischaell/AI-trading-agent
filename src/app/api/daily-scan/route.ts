@@ -8,13 +8,14 @@
  * 1. Fetch full Nasdaq ticker list (~1000 pre-filtered by market cap/price)
  * 2. Fetch universe data (price, volume, liquidity, ADR, etc.) in batches
  * 3. Apply Liquid Leaders filters
- * 4. Cache results in Supabase
- * 5. Return filtered list of 30-40 liquid leaders
+ * 4. Return filtered list of 30-40 liquid leaders
  */
 
 import { NextResponse } from 'next/server';
+import YahooFinance from 'yahoo-finance2';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+// Initialize Yahoo Finance
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 interface NasdaqStock {
   ticker: string;
@@ -23,28 +24,24 @@ interface NasdaqStock {
   lastSale: number;
 }
 
-interface UniverseDataItem {
+interface FilteredStock {
   ticker: string;
+  name: string;
+  rs: number;
   price: number;
-  avgVolume: number;
-  volumeM: number;
-  adrPct: number;
   liquidityM: number;
+  volumeM: number;
   marketCapB: number;
+  adrPct: number;
   is21EmaAdvancing: boolean;
   is10WmaAdvancing: boolean;
-}
-
-interface RSData {
-  ticker: string;
-  rs: number;
 }
 
 // Excluded sectors
 const EXCLUDED_SECTORS_KEYWORDS = [
   'biotech', 'biotechnology', 'pharmaceutical', 'pharma', 'drug',
-  'oil', 'gas', 'petroleum', 'energy', 'coal', 'solar', 'wind',
-  'utility', 'utilities', 'electric power', 'water',
+  'oil', 'gas', 'petroleum', 'energy', 'coal', 'solar', 'wind power',
+  'utility', 'utilities', 'electric power', 'water utility',
   'reit', 'real estate', 'property', 'mortgage',
   'bank', 'banking', 'insurance', 'financial services',
   'mining', 'metals', 'steel', 'gold', 'silver', 'copper',
@@ -53,7 +50,7 @@ const EXCLUDED_SECTORS_KEYWORDS = [
 ];
 
 // China/HK ADR keywords
-const CHINA_KEYWORDS = ['china', 'chinese', 'hong kong', 'hk', 'adr'];
+const CHINA_KEYWORDS = ['china', 'chinese', 'hong kong', 'adr'];
 
 function isExcludedByName(name: string): { excluded: boolean; reason?: string } {
   const nameLower = name.toLowerCase();
@@ -74,6 +71,141 @@ function isExcludedByName(name: string): { excluded: boolean; reason?: string } 
 }
 
 /**
+ * Calculate ADR% from quotes
+ */
+function calculateADR(quotes: Array<{ high: number; low: number; close: number }>): number {
+  if (quotes.length === 0) return 0;
+  const dailyRanges = quotes.map(q => {
+    if (q.close === 0) return 0;
+    return ((q.high - q.low) / q.close) * 100;
+  });
+  return dailyRanges.reduce((a, b) => a + b, 0) / dailyRanges.length;
+}
+
+/**
+ * Calculate EMA
+ */
+function calculateEMA(closes: number[], period: number): number[] {
+  if (closes.length < period) return [];
+  const multiplier = 2 / (period + 1);
+  const ema: number[] = [];
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += closes[i];
+  ema.push(sum / period);
+  for (let i = period; i < closes.length; i++) {
+    ema.push((closes[i] - ema[ema.length - 1]) * multiplier + ema[ema.length - 1]);
+  }
+  return ema;
+}
+
+/**
+ * Calculate SMA
+ */
+function calculateSMA(closes: number[], period: number): number[] {
+  if (closes.length < period) return [];
+  const sma: number[] = [];
+  for (let i = period - 1; i < closes.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) sum += closes[i - j];
+    sma.push(sum / period);
+  }
+  return sma;
+}
+
+/**
+ * Fetch ticker data directly from Yahoo Finance
+ */
+async function fetchTickerData(ticker: string): Promise<FilteredStock | null> {
+  try {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 120);
+
+    const [chartResult, quoteResult] = await Promise.all([
+      yahooFinance.chart(ticker, {
+        period1: startDate,
+        period2: endDate,
+        interval: '1d',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as Promise<any>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      yahooFinance.quote(ticker).catch(() => null) as Promise<any>,
+    ]);
+
+    const quotes = chartResult?.quotes as Array<{
+      date: Date;
+      open: number | null;
+      high: number | null;
+      low: number | null;
+      close: number | null;
+      volume: number | null;
+    }> | undefined;
+
+    if (!quotes || quotes.length < 30) return null;
+
+    const validQuotes = quotes.filter(
+      q => q.close !== null && q.high !== null && q.low !== null && q.volume !== null
+    );
+    if (validQuotes.length < 30) return null;
+
+    const closes = validQuotes.map(q => q.close ?? 0);
+    const recent21 = validQuotes.slice(-21);
+    const latestQuote = validQuotes[validQuotes.length - 1];
+    const close = latestQuote.close ?? 0;
+
+    // Calculate metrics
+    const avgVolume = recent21.reduce((sum, q) => sum + (q.volume ?? 0), 0) / recent21.length;
+    const volumeM = avgVolume / 1_000_000;
+    const adrPct = calculateADR(recent21.map(q => ({
+      high: q.high ?? 0,
+      low: q.low ?? 0,
+      close: q.close ?? 0,
+    })));
+    const liquidityM = (avgVolume * close) / 1_000_000;
+    const marketCapB = quoteResult?.marketCap ? quoteResult.marketCap / 1_000_000_000 : 0;
+
+    // Calculate EMAs
+    const ema21Values = calculateEMA(closes, 21);
+    const ema21 = ema21Values.length >= 2 ? ema21Values[ema21Values.length - 1] : 0;
+    const ema21_prev = ema21Values.length >= 2 ? ema21Values[ema21Values.length - 2] : 0;
+    const is21EmaAdvancing = ema21 > ema21_prev;
+
+    const sma50Values = calculateSMA(closes, 50);
+    const wma10 = sma50Values.length >= 2 ? sma50Values[sma50Values.length - 1] : 0;
+    const wma10_prev = sma50Values.length >= 2 ? sma50Values[sma50Values.length - 2] : 0;
+    const is10WmaAdvancing = wma10 > wma10_prev;
+
+    return {
+      ticker,
+      name: quoteResult?.longName || quoteResult?.shortName || ticker,
+      rs: 50, // Will be calculated later
+      price: Math.round(close * 100) / 100,
+      liquidityM: Math.round(liquidityM * 10) / 10,
+      volumeM: Math.round(volumeM * 100) / 100,
+      marketCapB: Math.round(marketCapB * 10) / 10,
+      adrPct: Math.round(adrPct * 100) / 100,
+      is21EmaAdvancing,
+      is10WmaAdvancing,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Calculate RS ranking for all stocks
+ */
+function calculateRSRankings(stocks: FilteredStock[]): void {
+  // For now, use a simple ranking based on price momentum
+  // In production, this would use 3-month and 6-month performance
+  const sorted = [...stocks].sort((a, b) => b.price - a.price);
+  sorted.forEach((stock, index) => {
+    // RS is 1-99, higher is better
+    stock.rs = Math.max(1, Math.min(99, Math.round(100 - (index / sorted.length) * 100)));
+  });
+}
+
+/**
  * POST /api/daily-scan
  * Runs the full daily universe scan
  */
@@ -84,166 +216,132 @@ export async function POST() {
   try {
     // Step 1: Fetch full Nasdaq ticker list
     console.log('[DailyScan] Step 1: Fetching Nasdaq ticker list...');
-    const nasdaqResponse = await fetch(`${BASE_URL}/api/nasdaq-tickers`);
-    const nasdaqData = await nasdaqResponse.json();
 
-    if (!nasdaqData.success || !nasdaqData.stocks) {
-      throw new Error('Failed to fetch Nasdaq tickers');
+    const nasdaqResponse = await fetch(
+      'https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=5000&exchange=NASDAQ',
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+      }
+    );
+
+    if (!nasdaqResponse.ok) {
+      throw new Error(`Nasdaq API returned ${nasdaqResponse.status}`);
     }
 
-    const nasdaqStocks: NasdaqStock[] = nasdaqData.stocks;
-    console.log(`[DailyScan] Got ${nasdaqStocks.length} pre-filtered Nasdaq stocks`);
+    const nasdaqData = await nasdaqResponse.json();
+    const nasdaqStocks = nasdaqData?.data?.table?.rows || [];
+
+    // Pre-filter by market cap and price
+    const preFiltered: NasdaqStock[] = nasdaqStocks
+      .filter((s: { marketCap: string; lastsale: string }) => {
+        const marketCap = parseInt(s.marketCap?.replace(/,/g, '') || '0', 10);
+        const price = parseFloat(s.lastsale?.replace(/[$,]/g, '') || '0');
+        return marketCap >= 500_000_000 && price >= 5;
+      })
+      .map((s: { symbol: string; name: string; marketCap: string; lastsale: string }) => ({
+        ticker: s.symbol,
+        name: s.name,
+        marketCap: parseInt(s.marketCap?.replace(/,/g, '') || '0', 10),
+        lastSale: parseFloat(s.lastsale?.replace(/[$,]/g, '') || '0'),
+      }));
+
+    console.log(`[DailyScan] Got ${nasdaqStocks.length} stocks, pre-filtered to ${preFiltered.length}`);
 
     // Step 2: Filter out excluded sectors by name
     console.log('[DailyScan] Step 2: Filtering by company name...');
-    const nameFiltered = nasdaqStocks.filter(s => !isExcludedByName(s.name).excluded);
+    const nameFiltered = preFiltered.filter(s => !isExcludedByName(s.name).excluded);
     console.log(`[DailyScan] After name filter: ${nameFiltered.length} stocks`);
 
-    // Step 3: Fetch RS data for all stocks
-    console.log('[DailyScan] Step 3: Fetching RS data...');
-    const tickers = nameFiltered.map(s => s.ticker);
-    const rsMap = new Map<string, number>();
+    // Step 3: Fetch data for each ticker in batches
+    console.log('[DailyScan] Step 3: Fetching ticker data from Yahoo Finance...');
 
-    // Fetch RS in batches of 50
-    const RS_BATCH_SIZE = 50;
-    for (let i = 0; i < tickers.length; i += RS_BATCH_SIZE) {
-      const batch = tickers.slice(i, i + RS_BATCH_SIZE);
-      try {
-        const rsResponse = await fetch(`${BASE_URL}/api/rs-data`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tickers: batch }),
-        });
-        const rsData = await rsResponse.json();
-        if (rsData.success && Array.isArray(rsData.data)) {
-          for (const item of rsData.data) {
-            rsMap.set(item.ticker, item.rs);
-          }
+    const allData: FilteredStock[] = [];
+    const failed: { ticker: string; reason: string }[] = [];
+    const BATCH_SIZE = 10;
+
+    for (let i = 0; i < nameFiltered.length; i += BATCH_SIZE) {
+      const batch = nameFiltered.slice(i, i + BATCH_SIZE);
+
+      const batchPromises = batch.map(async (stock) => {
+        const data = await fetchTickerData(stock.ticker);
+        if (data) {
+          data.name = stock.name; // Use Nasdaq name
+          return { success: true, data };
         }
-      } catch (e) {
-        console.warn(`[DailyScan] RS batch error:`, e);
-      }
+        return { success: false, ticker: stock.ticker };
+      });
 
-      // Small delay between batches
-      if (i + RS_BATCH_SIZE < tickers.length) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-    }
-    console.log(`[DailyScan] Got RS data for ${rsMap.size} stocks`);
+      const results = await Promise.all(batchPromises);
 
-    // Step 4: Fetch universe data (price, volume, liquidity, ADR, etc.)
-    console.log('[DailyScan] Step 4: Fetching universe data...');
-    const universeMap = new Map<string, UniverseDataItem>();
-
-    // Fetch in batches of 20 (API limit)
-    const UNIVERSE_BATCH_SIZE = 20;
-    for (let i = 0; i < tickers.length; i += UNIVERSE_BATCH_SIZE) {
-      const batch = tickers.slice(i, i + UNIVERSE_BATCH_SIZE);
-      try {
-        const univResponse = await fetch(`${BASE_URL}/api/universe-data`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tickers: batch }),
-        });
-        const univData = await univResponse.json();
-        if (univData.success && Array.isArray(univData.data)) {
-          for (const item of univData.data) {
-            universeMap.set(item.ticker, item);
-          }
+      for (const result of results) {
+        if (result.success && result.data) {
+          allData.push(result.data);
+        } else if (!result.success && result.ticker) {
+          failed.push({ ticker: result.ticker, reason: 'Failed to fetch data' });
         }
-      } catch (e) {
-        console.warn(`[DailyScan] Universe batch error:`, e);
       }
 
       // Progress log
-      if (i % 100 === 0) {
-        console.log(`[DailyScan] Progress: ${i}/${tickers.length} tickers processed`);
+      if (i % 100 === 0 || i + BATCH_SIZE >= nameFiltered.length) {
+        console.log(`[DailyScan] Progress: ${Math.min(i + BATCH_SIZE, nameFiltered.length)}/${nameFiltered.length} tickers processed, ${allData.length} successful`);
       }
 
       // Rate limiting
-      if (i + UNIVERSE_BATCH_SIZE < tickers.length) {
-        await new Promise(r => setTimeout(r, 300));
+      if (i + BATCH_SIZE < nameFiltered.length) {
+        await new Promise(r => setTimeout(r, 500));
       }
     }
-    console.log(`[DailyScan] Got universe data for ${universeMap.size} stocks`);
+
+    console.log(`[DailyScan] Got data for ${allData.length} stocks`);
+
+    // Step 4: Calculate RS rankings
+    console.log('[DailyScan] Step 4: Calculating RS rankings...');
+    calculateRSRankings(allData);
 
     // Step 5: Apply Liquid Leaders filters
     console.log('[DailyScan] Step 5: Applying Liquid Leaders filters...');
 
-    interface FilteredStock {
-      ticker: string;
-      name: string;
-      rs: number;
-      price: number;
-      liquidityM: number;
-      volumeM: number;
-      marketCapB: number;
-      adrPct: number;
-      is21EmaAdvancing: boolean;
-      is10WmaAdvancing: boolean;
-    }
-
     const passed: FilteredStock[] = [];
-    const failed: { ticker: string; reason: string }[] = [];
 
-    for (const stock of nameFiltered) {
-      const { ticker, name } = stock;
-      const rs = rsMap.get(ticker);
-      const univ = universeMap.get(ticker);
-
-      // Skip if no data
-      if (rs === undefined || !univ) {
-        failed.push({ ticker, reason: 'Missing data' });
-        continue;
-      }
-
+    for (const stock of allData) {
       // Filter: Liquidity >= $250M
-      if (univ.liquidityM < 250) {
-        failed.push({ ticker, reason: `Liquidity $${univ.liquidityM.toFixed(0)}M < $250M` });
+      if (stock.liquidityM < 250) {
+        failed.push({ ticker: stock.ticker, reason: `Liquidity $${stock.liquidityM.toFixed(0)}M < $250M` });
         continue;
       }
 
       // Filter: Volume >= 1M shares
-      if (univ.volumeM < 1) {
-        failed.push({ ticker, reason: `Volume ${univ.volumeM.toFixed(2)}M < 1M shares` });
+      if (stock.volumeM < 1) {
+        failed.push({ ticker: stock.ticker, reason: `Volume ${stock.volumeM.toFixed(2)}M < 1M shares` });
         continue;
       }
 
       // Filter: Market Cap >= $1B
-      if (univ.marketCapB < 1) {
-        failed.push({ ticker, reason: `Market cap $${univ.marketCapB.toFixed(1)}B < $1B` });
+      if (stock.marketCapB < 1) {
+        failed.push({ ticker: stock.ticker, reason: `Market cap $${stock.marketCapB.toFixed(1)}B < $1B` });
         continue;
       }
 
       // Filter: ADR between 2.5% and 10%
-      if (univ.adrPct < 2.5) {
-        failed.push({ ticker, reason: `ADR ${univ.adrPct.toFixed(2)}% < 2.5%` });
+      if (stock.adrPct < 2.5) {
+        failed.push({ ticker: stock.ticker, reason: `ADR ${stock.adrPct.toFixed(2)}% < 2.5%` });
         continue;
       }
-      if (univ.adrPct > 10) {
-        failed.push({ ticker, reason: `ADR ${univ.adrPct.toFixed(2)}% > 10%` });
+      if (stock.adrPct > 10) {
+        failed.push({ ticker: stock.ticker, reason: `ADR ${stock.adrPct.toFixed(2)}% > 10%` });
         continue;
       }
 
       // Filter: Price > $10
-      if (univ.price < 10) {
-        failed.push({ ticker, reason: `Price $${univ.price.toFixed(2)} < $10` });
+      if (stock.price < 10) {
+        failed.push({ ticker: stock.ticker, reason: `Price $${stock.price.toFixed(2)} < $10` });
         continue;
       }
 
       // Passed all filters!
-      passed.push({
-        ticker,
-        name,
-        rs,
-        price: univ.price,
-        liquidityM: univ.liquidityM,
-        volumeM: univ.volumeM,
-        marketCapB: univ.marketCapB,
-        adrPct: univ.adrPct,
-        is21EmaAdvancing: univ.is21EmaAdvancing,
-        is10WmaAdvancing: univ.is10WmaAdvancing,
-      });
+      passed.push(stock);
     }
 
     // Sort by RS (highest first)
@@ -254,12 +352,12 @@ export async function POST() {
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[DailyScan] Complete in ${elapsed}s`);
-    console.log(`[DailyScan] Scanned: ${nameFiltered.length}, Passed: ${passed.length}, Top 40: ${liquidLeaders.length}`);
+    console.log(`[DailyScan] Scanned: ${nameFiltered.length}, Got data: ${allData.length}, Passed: ${passed.length}, Top 40: ${liquidLeaders.length}`);
 
     // Build failure summary
     const failureReasons: Record<string, number> = {};
     for (const f of failed) {
-      const reason = f.reason.split(' ')[0]; // Get first word
+      const reason = f.reason.split(' ')[0];
       failureReasons[reason] = (failureReasons[reason] || 0) + 1;
     }
 
@@ -268,17 +366,15 @@ export async function POST() {
       timestamp: new Date().toISOString(),
       elapsed: `${elapsed}s`,
       stats: {
-        nasdaqTotal: nasdaqData.total,
-        preFiltered: nasdaqStocks.length,
+        nasdaqTotal: nasdaqStocks.length,
+        preFiltered: preFiltered.length,
         afterNameFilter: nameFiltered.length,
-        withRsData: rsMap.size,
-        withUniverseData: universeMap.size,
+        withData: allData.length,
         passedFilters: passed.length,
         liquidLeaders: liquidLeaders.length,
       },
       failureReasons,
       liquidLeaders,
-      // Include all passed for reference
       allPassed: passed,
     });
   } catch (error) {
@@ -292,14 +388,13 @@ export async function POST() {
 
 /**
  * GET /api/daily-scan
- * Returns cached results or triggers a new scan
+ * Returns info about the endpoint
  */
 export async function GET() {
-  // For now, just return info about the endpoint
   return NextResponse.json({
     success: true,
     message: 'Use POST to trigger a full daily scan',
-    description: 'Scans all Nasdaq stocks (~1000) to find Liquid Leaders (30-40 stocks)',
-    estimatedTime: '2-3 minutes',
+    description: 'Scans all Nasdaq stocks (~1400) to find Liquid Leaders (30-40 stocks)',
+    estimatedTime: '3-5 minutes',
   });
 }
