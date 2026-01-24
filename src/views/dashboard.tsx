@@ -1675,25 +1675,16 @@ function ViewSuggestedTrades({
   const marketState = state.marketState;
   const { passed, withheld, totals } = plan;
   const trimRecommendations = state.portfolio?.trim_recommendations ?? [];
-  // Get all sizing candidates, prioritizing PASS over WITHHOLD
+  // Get all sizing candidates - ONLY show PASS candidates (no withheld)
   const rawCandidates = state.sizing?.sizing ?? [];
-  // Sort: PASS candidates first (by score), then WITHHOLD candidates (by score)
-  // EXCLUDE candidates with earnings_too_close - they should not be shown at all
   const allCandidates = useMemo(() => {
-    // Filter out earnings_too_close from all candidates
-    const validCandidates = rawCandidates.filter(c => c.withhold_reason !== 'earnings_too_close');
-    const passedCandidates = validCandidates.filter(c => c.gate === 'PASS');
-    const withheldCandidates = validCandidates.filter(c => c.gate !== 'PASS');
-    // Sort each group by score descending
+    // Only show PASS candidates - no withheld ones at all
+    const passedCandidates = rawCandidates.filter(c => c.gate === 'PASS');
+    // Sort by score descending
     const sortByScore = (a: typeof rawCandidates[0], b: typeof rawCandidates[0]) => (b.score ?? 0) - (a.score ?? 0);
     passedCandidates.sort(sortByScore);
-    withheldCandidates.sort(sortByScore);
-    // Take up to 5: prioritize PASS, fill with WITHHOLD (excluding earnings_too_close)
-    const result = passedCandidates.slice(0, 5);
-    if (result.length < 5) {
-      result.push(...withheldCandidates.slice(0, 5 - result.length));
-    }
-    return result.slice(0, 5);
+    // Return up to 5 PASS candidates only
+    return passedCandidates.slice(0, 5);
   }, [rawCandidates]);
 
   // Track executed trades by ticker
