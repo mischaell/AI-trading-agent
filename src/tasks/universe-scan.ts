@@ -1,11 +1,19 @@
 /**
  * Task 2 — Liquid Leaders Universe Scan (EOD)
  *
- * Scans Nasdaq-100 for liquid growth leaders using locked filters.
+ * Scans all Nasdaq stocks for liquid growth leaders using locked filters.
  * All calculations use Decimal.js per TradingAgent.clinerules.
  *
+ * Filters:
+ * - $250M+ daily dollar liquidity
+ * - 1M+ shares avg daily volume
+ * - ADR between 2.5% and 10%
+ * - Price > $10
+ * - Market cap > $1B
+ * - Excludes China/HK ADRs
+ * - Excludes Biotech, Materials, Energy, Utilities, Real Estate, Healthcare, Industrials
+ *
  * @see agent_tasks.md Task 2
- * @see agent_skeleton_v1.0.md (universe filters)
  */
 
 import Decimal from 'decimal.js';
@@ -21,44 +29,53 @@ import { UniverseScanOutput, UniverseLeader, RefreshFrequency } from '@/types';
 export interface TickerData {
   /** Stock ticker symbol */
   ticker: string;
-  /** Relative strength ranking (0-99) */
+  /** Relative strength ranking (0-99, IBD-like) */
   rs: number;
   /** Average daily range as percentage */
   adr_pct: number;
   /** Average daily dollar liquidity in millions */
   liquidity_m: number;
+  /** Average daily volume in millions of shares */
+  volume_m?: number;
   /** Current price */
   price: number;
+  /** Market capitalization in billions */
+  market_cap_b?: number;
   /** Distance to 21EMA in ATR units */
   dist_21ema_atr: number;
   /** Days until earnings */
   earnings_days: number;
   /** Sector/theme classification */
   theme: string;
-  /** Whether ticker is excluded (China ADR) */
+  /** Whether ticker is excluded (China/HK ADR) */
   is_china_adr?: boolean;
-  /** Whether ticker is in a defensive sector */
-  is_defensive?: boolean;
+  /** Whether ticker is in an excluded sector */
+  is_excluded_sector?: boolean;
 }
 
 /**
- * Universe filter criteria (locked filters from agent_skeleton)
+ * Universe filter criteria (locked filters)
+ * Screens all Nasdaq stocks to find liquid growth leaders
  */
 export interface UniverseFilterCriteria {
-  /** Minimum relative strength (default: 70) */
+  /** Minimum relative strength rank (IBD-like, default: top 1000 = effectively no limit) */
   min_rs?: number;
-  /** Minimum daily liquidity in millions (default: 50) */
+  /** Minimum daily dollar liquidity in millions (default: 250) */
   min_liquidity_m?: number;
-  /** Minimum ADR percentage (default: 1.5) */
+  /** Minimum average daily volume in millions of shares (default: 1) */
+  min_volume_m?: number;
+  /** Minimum ADR percentage (default: 2.5) */
   min_adr_pct?: number;
-  /** Maximum ADR percentage (default: 15) */
+  /** Maximum ADR percentage (default: 10) */
   max_adr_pct?: number;
   /** Minimum price (default: 10) */
   min_price?: number;
-  /** Exclude China ADRs (default: true) */
+  /** Minimum market cap in billions (default: 1) */
+  min_market_cap_b?: number;
+  /** Exclude China & HK ADRs (default: true) */
   exclude_china?: boolean;
-  /** Exclude defensive sectors (default: true) */
-  exclude_defensives?: boolean;
+  /** Exclude specific sectors (default: true) */
+  exclude_sectors?: boolean;
   /** Target count range (default: { min: 30, max: 40 }) */
   target_count?: { min: number; max: number };
 }
@@ -77,30 +94,62 @@ interface FilterResult {
 
 /**
  * Default locked filter criteria for Liquid Leaders universe
- * These are the "locked filters" from agent_skeleton_v1.0.md
+ * Screens all Nasdaq stocks for liquid growth leaders
  */
 export const DEFAULT_UNIVERSE_CRITERIA: Required<UniverseFilterCriteria> = {
-  min_rs: 70,
-  min_liquidity_m: 50,
-  min_adr_pct: 1.5,
-  max_adr_pct: 15,
-  min_price: 10,
-  exclude_china: true,
-  exclude_defensives: true,
+  min_rs: 0,                    // Top 1000 RS rank (no minimum, sorted by RS)
+  min_liquidity_m: 250,         // $250M daily dollar liquidity
+  min_volume_m: 1,              // 1M shares avg daily volume
+  min_adr_pct: 2.5,             // ADR > 2.5%
+  max_adr_pct: 10,              // ADR < 10%
+  min_price: 10,                // Price > $10
+  min_market_cap_b: 1,          // Market cap > $1B
+  exclude_china: true,          // Exclude China & HK ADRs
+  exclude_sectors: true,        // Exclude specific sectors
   target_count: { min: 30, max: 40 },
 };
 
 /**
- * Defensive sector themes to exclude
+ * Sectors to exclude from universe
+ * Biotech, Materials, Defensive, Energy, Utilities, Real Estate, Healthcare, Industrials
  */
-const DEFENSIVE_THEMES = [
-  'Utilities',
+const EXCLUDED_SECTORS = [
+  // Biotech
+  'Biotech',
+  'Biotechnology',
+  'Pharmaceuticals',
+  // Materials
+  'Materials',
+  'Basic Materials',
+  'Chemicals',
+  'Metals & Mining',
+  // Defensive / Consumer Staples
   'Consumer Staples',
-  'Healthcare',
+  'Food & Beverage',
+  'Tobacco',
+  'Household Products',
+  // Energy
+  'Energy',
+  'Oil & Gas',
+  'Petroleum',
+  // Utilities
+  'Utilities',
+  'Electric Utilities',
+  'Gas Utilities',
+  // Real Estate
   'Real Estate',
   'REITs',
-  'Tobacco',
-  'Food & Beverage',
+  // Healthcare (excluding biotech already listed)
+  'Healthcare',
+  'Health Care',
+  'Medical Devices',
+  'Healthcare Services',
+  // Industrials
+  'Industrials',
+  'Industrial',
+  'Aerospace & Defense',
+  'Machinery',
+  'Construction',
 ];
 
 // =============================================================================
@@ -190,26 +239,62 @@ function passesChinaFilter(ticker: TickerData, excludeChina: boolean): FilterRes
 }
 
 /**
- * Check if ticker passes defensive sector exclusion
+ * Check if ticker passes volume filter
  */
-function passesDefensiveFilter(
+function passesVolumeFilter(ticker: TickerData, minVolume: number): FilterResult {
+  // If volume not provided, assume it passes (backwards compatibility)
+  if (ticker.volume_m === undefined) {
+    return { passed: true };
+  }
+
+  const volume = toDecimal(ticker.volume_m);
+  const minVol = toDecimal(minVolume);
+
+  if (volume.gte(minVol)) {
+    return { passed: true };
+  }
+  return { passed: false, reason: `Volume ${ticker.volume_m.toFixed(2)}M shares < ${minVolume}M` };
+}
+
+/**
+ * Check if ticker passes market cap filter
+ */
+function passesMarketCapFilter(ticker: TickerData, minMarketCap: number): FilterResult {
+  // If market cap not provided, assume it passes (backwards compatibility)
+  if (ticker.market_cap_b === undefined) {
+    return { passed: true };
+  }
+
+  const marketCap = toDecimal(ticker.market_cap_b);
+  const minCap = toDecimal(minMarketCap);
+
+  if (marketCap.gte(minCap)) {
+    return { passed: true };
+  }
+  return { passed: false, reason: `Market cap $${ticker.market_cap_b.toFixed(1)}B < $${minMarketCap}B` };
+}
+
+/**
+ * Check if ticker passes sector exclusion filter
+ */
+function passesSectorFilter(
   ticker: TickerData,
-  excludeDefensives: boolean
+  excludeSectors: boolean
 ): FilterResult {
-  if (!excludeDefensives) {
+  if (!excludeSectors) {
     return { passed: true };
   }
 
   // Check explicit flag first
-  if (ticker.is_defensive) {
-    return { passed: false, reason: 'Defensive sector excluded' };
+  if (ticker.is_excluded_sector) {
+    return { passed: false, reason: `Excluded sector (${ticker.theme})` };
   }
 
-  // Check theme against known defensive themes
+  // Check theme against excluded sectors
   const theme = ticker.theme.toLowerCase();
-  for (const defensive of DEFENSIVE_THEMES) {
-    if (theme.includes(defensive.toLowerCase())) {
-      return { passed: false, reason: `Defensive theme (${ticker.theme}) excluded` };
+  for (const sector of EXCLUDED_SECTORS) {
+    if (theme.includes(sector.toLowerCase())) {
+      return { passed: false, reason: `Excluded sector (${ticker.theme})` };
     }
   }
 
@@ -226,11 +311,13 @@ function applyFilters(
   // Check each filter in order of most likely to fail
   const filters = [
     () => passesChinaFilter(ticker, criteria.exclude_china),
-    () => passesDefensiveFilter(ticker, criteria.exclude_defensives),
-    () => passesRsFilter(ticker, criteria.min_rs),
+    () => passesSectorFilter(ticker, criteria.exclude_sectors),
+    () => passesMarketCapFilter(ticker, criteria.min_market_cap_b),
     () => passesLiquidityFilter(ticker, criteria.min_liquidity_m),
+    () => passesVolumeFilter(ticker, criteria.min_volume_m),
     () => passesPriceFilter(ticker, criteria.min_price),
     () => passesAdrFilter(ticker, criteria.min_adr_pct, criteria.max_adr_pct),
+    () => passesRsFilter(ticker, criteria.min_rs),
   ];
 
   for (const filter of filters) {
@@ -286,22 +373,21 @@ function toUniverseLeader(ticker: TickerData, rank: number): UniverseLeader {
 /**
  * Task 2 — Liquid Leaders Universe Scan
  *
- * Scans Nasdaq-100 for liquid growth leaders using locked filters.
+ * Scans all Nasdaq stocks for liquid growth leaders using locked filters:
+ * - $250M+ daily dollar liquidity
+ * - 1M+ shares avg daily volume
+ * - ADR between 2.5% and 10%
+ * - Price > $10
+ * - Market cap > $1B
+ * - Excludes China/HK ADRs
+ * - Excludes Biotech, Materials, Energy, Utilities, Real Estate, Healthcare, Industrials
+ *
  * Returns 30-40 tickers sorted by relative strength.
  *
  * @param tickers - Array of all ticker data to scan
  * @param criteria - Filter criteria (uses defaults if not specified)
  * @param refresh - Refresh frequency (default: 'EOD')
  * @returns UniverseScanOutput with 30-40 liquid leaders
- *
- * @example
- * ```typescript
- * const result = scanLiquidLeaders(allTickers, {
- *   min_rs: 75,  // Override default
- * });
- * console.log(result.count); // 30-40
- * console.log(result.tickers); // ['NVDA', 'META', ...]
- * ```
  */
 export function scanLiquidLeaders(
   tickers: TickerData[],
@@ -387,15 +473,17 @@ export function getFilterResults(
 export {
   passesRsFilter,
   passesLiquidityFilter,
+  passesVolumeFilter,
+  passesMarketCapFilter,
   passesAdrFilter,
   passesPriceFilter,
   passesChinaFilter,
-  passesDefensiveFilter,
+  passesSectorFilter,
   applyFilters,
   sortByRsAndLiquidity,
   toUniverseLeader,
   toDecimal,
-  DEFENSIVE_THEMES,
+  EXCLUDED_SECTORS,
 };
 
 export type { FilterResult };
