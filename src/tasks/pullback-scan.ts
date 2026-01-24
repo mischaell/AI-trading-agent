@@ -1,11 +1,19 @@
 /**
- * Task 3 — Liquid Leaders 21DMA Pullback Scan (EOD)
+ * Task 3 — Liquid Leaders 21EMA Pullback Scan (EOD)
  *
- * Filters universe to 5-10 pullback candidates near 21EMA structure.
+ * Filters Liquid Leaders to 5-20 pullback candidates near 21EMA structure.
  * All calculations use Decimal.js per TradingAgent.clinerules.
  *
+ * Filters (all Liquid Leaders filters plus):
+ * - Daily closing range > 10%
+ * - Price contraction (last 5 days)
+ * - Weekly return < 15%
+ * - 0 to 1 x ATR from 21EMA
+ * - -0.5 to 4 x ATR from 50SMA
+ * - Advancing 21EMA & 10WMA
+ * - Earnings in 7+ days
+ *
  * @see agent_tasks.md Task 3
- * @see agent_skeleton_v1.0.md Section 2 (Structure Definition)
  */
 
 import Decimal from 'decimal.js';
@@ -27,7 +35,7 @@ import { UniverseLeader } from '@/types/universe';
  * Includes additional metrics beyond UniverseLeader
  */
 export interface PullbackTickerData extends UniverseLeader {
-  /** Distance to 50EMA in ATR units */
+  /** Distance to 50SMA in ATR units */
   dist_50ema_atr: number;
   /** Daily closing range percentage (0-100) */
   close_range_pct: number;
@@ -45,28 +53,36 @@ export interface PullbackTickerData extends UniverseLeader {
   ema21_low: number;
   /** Current close price */
   close: number;
+  /** Whether 21EMA is advancing (rising) */
+  is_21ema_advancing?: boolean;
+  /** Whether 10WMA is advancing (rising) */
+  is_10wma_advancing?: boolean;
 }
 
 /**
  * Pullback filter criteria
  */
 export interface PullbackFilterCriteria {
-  /** Min distance to 21EMA in ATR (-0.5 default) */
+  /** Min distance to 21EMA in ATR (0 default) */
   min_dist_21_atr?: number;
   /** Max distance to 21EMA in ATR (+1.0 default) */
   max_dist_21_atr?: number;
-  /** Min distance to 50EMA in ATR (0 default) */
+  /** Min distance to 50SMA in ATR (-0.5 default) */
   min_dist_50_atr?: number;
-  /** Max distance to 50EMA in ATR (+3.0 default) */
+  /** Max distance to 50SMA in ATR (+4.0 default) */
   max_dist_50_atr?: number;
-  /** Min closing range percentage (20% default) */
+  /** Min closing range percentage (10% default) */
   min_close_range_pct?: number;
-  /** Require price contraction (default: false for flexibility) */
+  /** Require price contraction - 5 day (default: true) */
   require_contraction?: boolean;
-  /** Max weekly return percentage (12% default) */
+  /** Max weekly return percentage (15% default) */
   max_weekly_return_pct?: number;
   /** Min days to earnings (7 default) */
   min_earnings_days?: number;
+  /** Require advancing 21EMA (default: true) */
+  require_advancing_21ema?: boolean;
+  /** Require advancing 10WMA (default: true) */
+  require_advancing_10wma?: boolean;
   /** Target candidate count range */
   target_count?: { min: number; max: number };
 }
@@ -103,31 +119,35 @@ interface PullbackFilterResult {
 
 /**
  * Default locked filter criteria for pullback scan
- * Based on agent_skeleton and wireframe specifications
+ * All Liquid Leaders filters plus pullback-specific criteria
  */
 export const DEFAULT_PULLBACK_CRITERIA: Required<PullbackFilterCriteria> = {
-  min_dist_21_atr: -0.5,
+  min_dist_21_atr: 0,           // 0 to 1 x ATR from 21EMA
   max_dist_21_atr: 1.0,
-  min_dist_50_atr: 0,
-  max_dist_50_atr: 3.0,
-  min_close_range_pct: 20,
-  require_contraction: false, // Soft filter - affects grade, not pass/fail
-  max_weekly_return_pct: 12,
-  min_earnings_days: 7,
-  target_count: { min: 5, max: 10 },
+  min_dist_50_atr: -0.5,        // -0.5 to 4 x ATR from 50SMA
+  max_dist_50_atr: 4.0,
+  min_close_range_pct: 10,      // Daily closing range > 10%
+  require_contraction: true,    // Price contraction (last 5 days) - REQUIRED
+  max_weekly_return_pct: 15,    // Weekly return < 15%
+  min_earnings_days: 7,         // Earnings in 7+ days
+  require_advancing_21ema: true, // Advancing 21EMA
+  require_advancing_10wma: true, // Advancing 10WMA
+  target_count: { min: 5, max: 20 }, // Max 20 candidates (was 10)
 };
 
 /**
  * Scan rules for display (human-readable)
  */
 export const PULLBACK_SCAN_RULES: PullbackScanRules = {
-  not_extended: '< 1x ADR from 21EMA structure',
-  dist_21_atr: '-0.5 to +1.0 x ATR from 21EMA',
-  dist_50_atr: '0 to +3.0 x ATR from 50EMA',
-  close_in_upper_range: '> 20% daily closing range',
-  contraction: 'Price contraction (5d vs 20d)',
-  weekly_return: 'Weekly return < 12%',
+  not_extended: '0 to 1x ATR from 21EMA',
+  dist_21_atr: '0 to +1.0 x ATR from 21EMA',
+  dist_50_atr: '-0.5 to +4.0 x ATR from 50SMA',
+  close_in_upper_range: '> 10% daily closing range',
+  contraction: 'Price contraction (last 5 days)',
+  weekly_return: 'Weekly return < 15%',
   earnings: 'Earnings in 7+ days',
+  advancing_21ema: 'Advancing 21EMA',
+  advancing_10wma: 'Advancing 10WMA',
 };
 
 // =============================================================================
@@ -305,6 +325,72 @@ function checkEarningsFilter(
 }
 
 /**
+ * Check advancing 21EMA filter
+ */
+function checkAdvancing21EmaFilter(
+  ticker: PullbackTickerData,
+  require: boolean
+): FilterCheck {
+  // If not required, always pass
+  if (!require) {
+    return {
+      name: 'advancing_21ema',
+      passed: true,
+      value: ticker.is_21ema_advancing ? 'YES' : 'NO',
+    };
+  }
+
+  // If data not provided, assume it passes (backwards compatibility)
+  if (ticker.is_21ema_advancing === undefined) {
+    return {
+      name: 'advancing_21ema',
+      passed: true,
+      value: 'N/A',
+    };
+  }
+
+  return {
+    name: 'advancing_21ema',
+    passed: ticker.is_21ema_advancing,
+    value: ticker.is_21ema_advancing ? 'YES' : 'NO',
+    reason: ticker.is_21ema_advancing ? undefined : '21EMA not advancing',
+  };
+}
+
+/**
+ * Check advancing 10WMA filter
+ */
+function checkAdvancing10WmaFilter(
+  ticker: PullbackTickerData,
+  require: boolean
+): FilterCheck {
+  // If not required, always pass
+  if (!require) {
+    return {
+      name: 'advancing_10wma',
+      passed: true,
+      value: ticker.is_10wma_advancing ? 'YES' : 'NO',
+    };
+  }
+
+  // If data not provided, assume it passes (backwards compatibility)
+  if (ticker.is_10wma_advancing === undefined) {
+    return {
+      name: 'advancing_10wma',
+      passed: true,
+      value: 'N/A',
+    };
+  }
+
+  return {
+    name: 'advancing_10wma',
+    passed: ticker.is_10wma_advancing,
+    value: ticker.is_10wma_advancing ? 'YES' : 'NO',
+    reason: ticker.is_10wma_advancing ? undefined : '10WMA not advancing',
+  };
+}
+
+/**
  * Apply all pullback filters to a ticker
  */
 function applyPullbackFilters(
@@ -318,12 +404,16 @@ function applyPullbackFilters(
     checkContractionFilter(ticker, criteria.require_contraction),
     checkWeeklyReturnFilter(ticker, criteria.max_weekly_return_pct),
     checkEarningsFilter(ticker, criteria.min_earnings_days),
+    checkAdvancing21EmaFilter(ticker, criteria.require_advancing_21ema),
+    checkAdvancing10WmaFilter(ticker, criteria.require_advancing_10wma),
   ];
 
   // Count passed checks for scoring
   const passedCount = checks.filter(c => c.passed).length;
-  const totalHardFilters = checks.filter(c => c.name !== 'contraction').length;
-  const passedHardFilters = checks.filter(c => c.name !== 'contraction' && c.passed).length;
+
+  // All filters are now hard filters (including contraction)
+  const totalHardFilters = checks.length;
+  const passedHardFilters = checks.filter(c => c.passed).length;
 
   // Overall pass: all hard filters must pass
   const passed = passedHardFilters === totalHardFilters;
@@ -638,6 +728,8 @@ export {
   checkContractionFilter,
   checkWeeklyReturnFilter,
   checkEarningsFilter,
+  checkAdvancing21EmaFilter,
+  checkAdvancing10WmaFilter,
   applyPullbackFilters,
   calculateGrade,
   sortCandidates,
