@@ -373,8 +373,9 @@ function evaluateGate(
     };
   }
 
-  // Gate 3: NER exceeds allowed
-  if (sizing.ner_percent.gt(maxNer)) {
+  // Gate 3: NER exceeds allowed (with small tolerance for floating point)
+  const nerTolerance = toDecimal(0.01); // 0.01% tolerance
+  if (sizing.ner_percent.gt(maxNer.plus(nerTolerance))) {
     return {
       gate: 'WITHHOLD',
       reason: 'ner_exceeds_limit',
