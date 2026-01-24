@@ -1678,14 +1678,17 @@ function ViewSuggestedTrades({
   // Get all sizing candidates, prioritizing PASS over WITHHOLD
   const rawCandidates = state.sizing?.sizing ?? [];
   // Sort: PASS candidates first (by score), then WITHHOLD candidates (by score)
+  // EXCLUDE candidates with earnings_too_close - they should not be shown at all
   const allCandidates = useMemo(() => {
-    const passedCandidates = rawCandidates.filter(c => c.gate === 'PASS');
-    const withheldCandidates = rawCandidates.filter(c => c.gate !== 'PASS');
+    // Filter out earnings_too_close from all candidates
+    const validCandidates = rawCandidates.filter(c => c.withhold_reason !== 'earnings_too_close');
+    const passedCandidates = validCandidates.filter(c => c.gate === 'PASS');
+    const withheldCandidates = validCandidates.filter(c => c.gate !== 'PASS');
     // Sort each group by score descending
     const sortByScore = (a: typeof rawCandidates[0], b: typeof rawCandidates[0]) => (b.score ?? 0) - (a.score ?? 0);
     passedCandidates.sort(sortByScore);
     withheldCandidates.sort(sortByScore);
-    // Take up to 5: prioritize PASS, fill with WITHHOLD
+    // Take up to 5: prioritize PASS, fill with WITHHOLD (excluding earnings_too_close)
     const result = [...passedCandidates];
     if (result.length < 5) {
       result.push(...withheldCandidates.slice(0, 5 - result.length));
