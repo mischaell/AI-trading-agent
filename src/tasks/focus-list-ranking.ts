@@ -472,20 +472,15 @@ export function rankFocusList(
   const sortedTradeable = sortByScore(tradeable);
   const sortedBlocked = sortByScore(blocked);
 
-  // Prioritize tradeable candidates, fill remaining slots with blocked
-  let rankedCandidates: ScoredCandidate[] = [];
+  // Output up to 10 tradeable candidates (no blocked/earnings-close candidates)
+  // This gives sizing step enough candidates to filter and still have 5 PASS
+  const MAX_CANDIDATES = 10;
 
-  // Take up to 5 tradeable candidates first
-  rankedCandidates = sortedTradeable.slice(0, 5);
+  // Take up to MAX_CANDIDATES tradeable candidates ONLY (no blocked)
+  let rankedCandidates = sortedTradeable.slice(0, MAX_CANDIDATES);
 
-  // If we have fewer than 5 tradeable, fill with blocked candidates
-  if (rankedCandidates.length < 5) {
-    const remaining = 5 - rankedCandidates.length;
-    rankedCandidates = [...rankedCandidates, ...sortedBlocked.slice(0, remaining)];
-  }
-
-  // Keep rest for potential promotion
-  const allRanked = [...rankedCandidates, ...sortedTradeable.slice(5), ...sortedBlocked.slice(Math.max(0, 5 - sortedTradeable.length))];
+  // Keep all tradeable for potential promotion
+  const allRanked = sortedTradeable;
 
   // Get initial top 5 tickers (before promotion)
   const initialTop5 = rankedCandidates.slice(0, 5).map(c => c.data.ticker);
@@ -494,15 +489,15 @@ export function rankFocusList(
   const promotion = validateManualPromotion(manualPromotion, allRanked, initialTop5);
 
   if (promotion.used) {
-    rankedCandidates = applyPromotion(allRanked, promotion).slice(0, 5);
+    rankedCandidates = applyPromotion(allRanked, promotion).slice(0, MAX_CANDIDATES);
   }
 
-  // Get final top 5
+  // Get final top 5 tickers (for display)
   const top5Candidates = rankedCandidates.slice(0, 5);
   const top5Tickers = top5Candidates.map(c => c.data.ticker);
 
-  // Convert to output format
-  const focusListCandidates = top5Candidates.map((c, i) =>
+  // Convert ALL ranked candidates to output format (not just top 5)
+  const focusListCandidates = rankedCandidates.map((c, i) =>
     toFocusListCandidate(c, i + 1)
   );
 

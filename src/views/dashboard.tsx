@@ -1689,11 +1689,11 @@ function ViewSuggestedTrades({
     passedCandidates.sort(sortByScore);
     withheldCandidates.sort(sortByScore);
     // Take up to 5: prioritize PASS, fill with WITHHOLD (excluding earnings_too_close)
-    const result = [...passedCandidates];
+    const result = passedCandidates.slice(0, 5);
     if (result.length < 5) {
       result.push(...withheldCandidates.slice(0, 5 - result.length));
     }
-    return result;
+    return result.slice(0, 5);
   }, [rawCandidates]);
 
   // Track executed trades by ticker
