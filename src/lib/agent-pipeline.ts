@@ -245,20 +245,41 @@ interface EarningsData {
 
 const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour
 
+interface DailyScanResult {
+  ticker: string;
+  name: string;
+  rs: number;
+  price: number;
+  liquidityM: number;
+  volumeM: number;
+  marketCapB: number;
+  adrPct: number;
+  is21EmaAdvancing: boolean;
+  is10WmaAdvancing: boolean;
+}
+
+const DAILY_CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 const pipelineCache: {
   rsData: CacheEntry<Map<string, RSData>> | null;
   universeData: CacheEntry<Map<string, UniverseDataItem>> | null;
   structureData: CacheEntry<Map<string, StructureAnalysis>> | null;
   earningsData: CacheEntry<Map<string, EarningsData>> | null;
+  dailyScan: CacheEntry<DailyScanResult[]> | null;
 } = {
   rsData: null,
   universeData: null,
   structureData: null,
   earningsData: null,
+  dailyScan: null,
 };
 
 function isCacheValid<T>(entry: CacheEntry<T> | null): boolean {
   return entry !== null && Date.now() - entry.timestamp < CACHE_DURATION_MS;
+}
+
+function isDailyCacheValid<T>(entry: CacheEntry<T> | null): boolean {
+  return entry !== null && Date.now() - entry.timestamp < DAILY_CACHE_DURATION_MS;
 }
 
 /**
@@ -269,6 +290,7 @@ export function clearPipelineCache(): void {
   pipelineCache.universeData = null;
   pipelineCache.structureData = null;
   pipelineCache.earningsData = null;
+  pipelineCache.dailyScan = null;
   console.log('[Pipeline] Cache cleared');
 }
 
@@ -1146,117 +1168,130 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     saveMarketSnapshot(marketState, today).catch(e => console.error('[Pipeline] Snapshot save error:', e));
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Task 2: Universe Scan (cached 1 hour)
-    // Now fetches REAL data before filtering
+    // Task 2: Universe Scan (uses daily scan cache - 24 hours)
+    // Full Nasdaq scan runs once per day, results cached for quick pipeline runs
     // ─────────────────────────────────────────────────────────────────────────
-    await notify('Task 2', 'starting', 10, 'Fetching RS data...');
+    await notify('Task 2', 'starting', 10, 'Loading liquid leaders...');
 
-    let rsData: Map<string, RSData>;
-    if (isCacheValid(pipelineCache.rsData)) {
-      rsData = pipelineCache.rsData!.data;
-      console.log('[Pipeline] Task 2: Using cached RS data');
+    let dailyScanResults: DailyScanResult[];
+    let universeItemData: Map<string, UniverseDataItem> = new Map();
+
+    // Check if we have cached daily scan results
+    if (isDailyCacheValid(pipelineCache.dailyScan)) {
+      dailyScanResults = pipelineCache.dailyScan!.data;
+      console.log(`[Pipeline] Task 2: Using cached daily scan (${dailyScanResults.length} liquid leaders)`);
+      await notify('Task 2', 'running', 15, `Using cached scan: ${dailyScanResults.length} liquid leaders`);
     } else {
-      rsData = await fetchRSData(NASDAQ_100_TICKERS);
-      pipelineCache.rsData = { data: rsData, timestamp: Date.now() };
-      console.log('[Pipeline] Task 2: Fetched fresh RS data');
-    }
+      // Need to run daily scan - this takes 2-3 minutes
+      await notify('Task 2', 'running', 12, 'Running full Nasdaq scan (this takes 2-3 min)...');
+      console.log('[Pipeline] Task 2: Running full daily scan...');
 
-    // Fetch REAL universe data for ALL tickers BEFORE filtering
-    await notify('Task 2', 'running', 12, 'Fetching universe data (price, volume, liquidity)...');
+      try {
+        const scanResponse = await fetch(`${BASE_URL}/api/daily-scan`, {
+          method: 'POST',
+        });
+        const scanData = await scanResponse.json() as {
+          success: boolean;
+          liquidLeaders?: DailyScanResult[];
+          stats?: { passedFilters: number };
+        };
 
-    let universeItemData: Map<string, UniverseDataItem>;
-    if (isCacheValid(pipelineCache.universeData)) {
-      universeItemData = pipelineCache.universeData!.data;
-      console.log('[Pipeline] Task 2: Using cached universe data');
-    } else {
-      universeItemData = new Map();
+        if (scanData.success && Array.isArray(scanData.liquidLeaders)) {
+          dailyScanResults = scanData.liquidLeaders;
+          pipelineCache.dailyScan = { data: dailyScanResults, timestamp: Date.now() };
+          console.log(`[Pipeline] Task 2: Daily scan complete - ${dailyScanResults.length} liquid leaders`);
+        } else {
+          throw new Error('Daily scan failed');
+        }
+      } catch (error) {
+        console.error('[Pipeline] Daily scan failed, falling back to Nasdaq-100:', error);
+        await notify('Task 2', 'running', 15, 'Daily scan failed, using Nasdaq-100 fallback...');
 
-      // Fetch universe data in batches using the batch API
-      const BATCH_SIZE = 20; // API max batch size
-      for (let i = 0; i < NASDAQ_100_TICKERS.length; i += BATCH_SIZE) {
-        const batch = NASDAQ_100_TICKERS.slice(i, i + BATCH_SIZE);
-        try {
-          const response = await fetch(`${BASE_URL}/api/universe-data`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tickers: batch }),
-          });
-          const result = await response.json() as { success: boolean; data?: UniverseDataItem[] };
-          if (result.success && Array.isArray(result.data)) {
-            for (const item of result.data) {
-              universeItemData.set(item.ticker, item);
+        // Fallback to Nasdaq-100 only
+        const rsData = await fetchRSData(NASDAQ_100_TICKERS);
+
+        // Quick fetch of universe data for fallback
+        for (let i = 0; i < NASDAQ_100_TICKERS.length; i += 20) {
+          const batch = NASDAQ_100_TICKERS.slice(i, i + 20);
+          try {
+            const response = await fetch(`${BASE_URL}/api/universe-data`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tickers: batch }),
+            });
+            const result = await response.json() as { success: boolean; data?: UniverseDataItem[] };
+            if (result.success && Array.isArray(result.data)) {
+              for (const item of result.data) {
+                universeItemData.set(item.ticker, item);
+              }
             }
+          } catch {
+            // Continue on error
           }
-        } catch (error) {
-          console.error(`[Pipeline] Failed to fetch universe batch:`, error);
+          await delay(200);
         }
 
-        // Rate limiting between batches
-        if (i + BATCH_SIZE < NASDAQ_100_TICKERS.length) {
-          await delay(300);
+        // Build fallback results
+        dailyScanResults = [];
+        for (const ticker of NASDAQ_100_TICKERS) {
+          const rs = rsData.get(ticker);
+          const univ = universeItemData.get(ticker);
+          if (rs && univ && univ.liquidityM >= 250 && univ.volumeM >= 1 && univ.adrPct >= 2.5 && univ.adrPct <= 10) {
+            dailyScanResults.push({
+              ticker,
+              name: ticker,
+              rs: rs.rs,
+              price: univ.price,
+              liquidityM: univ.liquidityM,
+              volumeM: univ.volumeM,
+              marketCapB: univ.marketCapB ?? 0,
+              adrPct: univ.adrPct,
+              is21EmaAdvancing: univ.is21EmaAdvancing ?? false,
+              is10WmaAdvancing: univ.is10WmaAdvancing ?? false,
+            });
+          }
         }
-
-        // Progress update
-        const progress = 12 + Math.round((i / NASDAQ_100_TICKERS.length) * 8);
-        await notify('Task 2', 'running', progress, `Fetched ${Math.min(i + BATCH_SIZE, NASDAQ_100_TICKERS.length)}/${NASDAQ_100_TICKERS.length} tickers`);
+        dailyScanResults.sort((a, b) => b.rs - a.rs);
+        dailyScanResults = dailyScanResults.slice(0, 40);
       }
-
-      pipelineCache.universeData = { data: universeItemData, timestamp: Date.now() };
-      console.log(`[Pipeline] Task 2: Fetched universe data for ${universeItemData.size} tickers`);
     }
 
-    await notify('Task 2', 'running', 20, 'Filtering liquid leaders...');
-
-    // Helper to check if sector is excluded
-    const isExcludedSector = (theme: string) => {
-      const themeLower = theme.toLowerCase();
-      const EXCLUDED_SECTORS = [
-        'biotech', 'biotechnology', 'pharmaceuticals', 'pharma',
-        'materials', 'basic materials', 'chemicals', 'metals', 'mining',
-        'consumer staples', 'food', 'beverage', 'tobacco', 'household',
-        'energy', 'oil', 'gas', 'petroleum',
-        'utilities', 'electric utilities', 'gas utilities',
-        'real estate', 'reits',
-        'healthcare', 'health care', 'medical', 'diagnostics',
-        'industrials', 'industrial', 'aerospace', 'defense', 'machinery', 'construction',
-      ];
-      return EXCLUDED_SECTORS.some(s => themeLower.includes(s));
-    };
-
-    // Build TickerData with REAL data for universe scan
-    const tickerDataForScan: TickerData[] = [];
-    for (const ticker of NASDAQ_100_TICKERS) {
-      const rs = rsData.get(ticker);
-      const univData = universeItemData.get(ticker);
-
-      // Skip if no data available
-      if (!rs || !univData) {
-        console.log(`[Pipeline] Skipping ${ticker}: missing RS or universe data`);
-        continue;
-      }
-
-      const theme = TICKER_THEMES[ticker] || 'Unknown';
-
-      tickerDataForScan.push({
-        ticker,
-        rs: rs.rs,
-        adr_pct: univData.adrPct,
-        liquidity_m: univData.liquidityM,
-        volume_m: univData.volumeM,
-        price: univData.price,
-        market_cap_b: univData.marketCapB,
-        dist_21ema_atr: 0, // Will be calculated in Task 3
-        earnings_days: 30, // Will be updated in Task 4
-        theme,
-        is_china_adr: CHINA_ADRS.has(ticker),
-        is_excluded_sector: isExcludedSector(theme),
+    // Build universeItemData from daily scan results for later use
+    for (const stock of dailyScanResults) {
+      universeItemData.set(stock.ticker, {
+        ticker: stock.ticker,
+        price: stock.price,
+        avgVolume: 0,
+        adrPct: stock.adrPct,
+        liquidityM: stock.liquidityM,
+        volumeM: stock.volumeM,
+        marketCapB: stock.marketCapB,
+        is21EmaAdvancing: stock.is21EmaAdvancing,
+        is10WmaAdvancing: stock.is10WmaAdvancing,
       });
     }
+    pipelineCache.universeData = { data: universeItemData, timestamp: Date.now() };
 
-    console.log(`[Pipeline] Task 2: Built TickerData for ${tickerDataForScan.length} tickers with real data`);
+    // Build TickerData from daily scan results
+    const tickerDataForScan: TickerData[] = dailyScanResults.map(stock => ({
+      ticker: stock.ticker,
+      rs: stock.rs,
+      adr_pct: stock.adrPct,
+      liquidity_m: stock.liquidityM,
+      volume_m: stock.volumeM,
+      price: stock.price,
+      market_cap_b: stock.marketCapB,
+      dist_21ema_atr: 0, // Will be calculated in Task 3
+      earnings_days: 30, // Will be updated in Task 4
+      theme: TICKER_THEMES[stock.ticker] || 'Technology',
+      is_china_adr: false, // Already filtered in daily scan
+      is_excluded_sector: false, // Already filtered in daily scan
+    }));
+
+    console.log(`[Pipeline] Task 2: Built TickerData for ${tickerDataForScan.length} liquid leaders`);
 
     const universe = scanLiquidLeaders(tickerDataForScan);
-    await notify('Task 2', 'complete', 25, `Found ${universe.count} liquid leaders`);
+    await notify('Task 2', 'complete', 25, `Found ${universe.count} liquid leaders from ${dailyScanResults.length} scanned`);
 
     // >>> PERSIST: Cache universe to Supabase (non-blocking)
     saveUniverseCache(universe, today).catch(e => console.error('[Pipeline] Universe cache error:', e));
