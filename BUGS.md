@@ -139,6 +139,40 @@ export type { SomeType } from './module';
 
 ---
 
+### 2. Duplicate Trim Buttons in Portfolio View (Fixed)
+
+**File:** `src/views/dashboard.tsx`
+
+**Issue:** Positions at 2R profit (e.g., AMD, GOOGL) displayed Trim buttons in TWO places:
+1. "Trim Recommendations (2R Targets)" section in Suggested Trades view
+2. Actions column in Portfolio view
+
+This was redundant and confusing for users.
+
+**Root Cause:** The Portfolio view had its own trim button logic (`canTrim = rMultiple >= 2 && p.trimmed < 33`) that duplicated the Trim Recommendations section.
+
+**Fix:** Removed the Trim button from Portfolio view. Trims are now only accessible via the "Trim Recommendations" section in Suggested Trades view, keeping the Sell button in Portfolio for custom sells.
+
+**Additional Issue:** Initial fix missed a reference to `canTrim` in the Trim% column display (showing "Ready" status). Changed to use `p.trim_available` instead.
+
+**Status:** Fixed - 2026-01-24
+
+---
+
+### 3. R and Heat Displaying as "-0.0" (Fixed)
+
+**File:** `src/views/dashboard.tsx`
+
+**Issue:** R multiple and Heat percentage displayed as "-0.0R" and "-0.0%" due to floating-point negative zero. The '+' sign was being added incorrectly when value was exactly 0 or negative zero.
+
+**Root Cause:** The condition `rMultiple >= 0` is true for -0.0, but `toFixed(1)` renders it as "-0.0", creating confusing output.
+
+**Fix:** Changed condition from `>= 0` to `> 0.005` to only add '+' when value is actually positive.
+
+**Status:** Fixed - 2026-01-24
+
+---
+
 ## Technical Debt
 
 ### 1. Hardcoded Mock Data
@@ -186,4 +220,4 @@ Consider adding these compiler options to fix iterator issues:
 
 ---
 
-*Last updated: 2026-01-23*
+*Last updated: 2026-01-24*

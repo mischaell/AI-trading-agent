@@ -715,122 +715,6 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * Generate mock positions for Task 8
- */
-function generateMockPositions(): RawPosition[] {
-  return [
-    {
-      ticker: 'NVDA',
-      shares: 10,
-      avg_price: 450.00,
-      last_price: 485.00,
-      ssl: 435.00,
-      trim_2r_price: 480.00,
-      original_shares: 15,
-      earnings_days: 28,
-      dist_21_atr: 0.3,
-      theme: 'AI Compute',
-    },
-    {
-      ticker: 'META',
-      shares: 8,
-      avg_price: 380.00,
-      last_price: 420.00,
-      ssl: 365.00,
-      trim_2r_price: 410.00,
-      original_shares: 12,
-      earnings_days: 14,
-      dist_21_atr: 0.1,
-      theme: 'Ads/AI',
-    },
-    {
-      ticker: 'GOOGL',
-      shares: 20,
-      avg_price: 145.00,
-      last_price: 152.00,
-      ssl: 140.00,
-      trim_2r_price: 155.00,
-      original_shares: 20,
-      earnings_days: 21,
-      dist_21_atr: -0.2,
-      theme: 'Search/AI',
-    },
-  ];
-}
-
-/**
- * Generate mock recent trades for Task 8
- */
-function generateMockRecentTrades(): RecentTrade[] {
-  return [
-    {
-      ticker: 'NVDA',
-      side: 'SELL',
-      action: 'TRIM',
-      shares: 5,
-      price: 480.00,
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-      r_multiple: 2.0,
-    },
-    {
-      ticker: 'META',
-      side: 'SELL',
-      action: 'TRIM',
-      shares: 4,
-      price: 410.00,
-      timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-      r_multiple: 2.0,
-    },
-  ];
-}
-
-/**
- * Generate mock trade fills for Task 9
- */
-function generateMockTradeFills(): RawTradeFill[] {
-  const now = Date.now();
-
-  return [
-    {
-      timestamp: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-      ticker: 'ANET',
-      side: 'BUY',
-      action_type: 'ENTRY',
-      shares: 15,
-      price: 285.50,
-      mode: 'MODE1',
-    },
-    {
-      timestamp: new Date(now - 4 * 60 * 60 * 1000).toISOString(),
-      ticker: 'NVDA',
-      side: 'SELL',
-      action_type: 'TRIM',
-      shares: 5,
-      price: 480.00,
-      r_multiple: 2.0,
-    },
-    {
-      timestamp: new Date(now - 6 * 60 * 60 * 1000).toISOString(),
-      ticker: 'META',
-      side: 'SELL',
-      action_type: 'TRIM',
-      shares: 4,
-      price: 410.00,
-      r_multiple: 2.0,
-    },
-    {
-      timestamp: new Date(now - 8 * 60 * 60 * 1000).toISOString(),
-      ticker: 'AMD',
-      side: 'BUY',
-      action_type: 'ENTRY',
-      shares: 25,
-      price: 165.00,
-      mode: 'MODE2',
-    },
-  ];
-}
-
 // =============================================================================
 // Supabase Helper Functions
 // =============================================================================
@@ -914,6 +798,9 @@ function convertPositionRowToRawPosition(row: PositionRow): RawPosition {
   const ssl = Number(row.ssl);
   // Calculate 2R price: entry + 2 * risk, where risk = entry - ssl
   const calculated2R = avgPrice + 2 * (avgPrice - ssl);
+  const trim2r = row.trim_2r_price ? Number(row.trim_2r_price) : calculated2R;
+
+  console.log(`[Position] ${row.ticker}: entry=$${avgPrice.toFixed(2)}, ssl=$${ssl.toFixed(2)}, trim_2r=$${trim2r.toFixed(2)} (db: ${row.trim_2r_price})`);
 
   return {
     ticker: row.ticker,
@@ -921,7 +808,7 @@ function convertPositionRowToRawPosition(row: PositionRow): RawPosition {
     avg_price: avgPrice,
     last_price: avgPrice, // Will be updated with real price later
     ssl: ssl,
-    trim_2r_price: row.trim_2r_price ? Number(row.trim_2r_price) : calculated2R,
+    trim_2r_price: trim2r,
     original_shares: row.shares, // Approximate - would need to track separately
     earnings_days: undefined, // Would come from market data
     dist_21_atr: undefined, // Would come from market data
@@ -965,6 +852,75 @@ function convertTradeRowToTradeFill(row: TradeRow): RawTradeFill {
 }
 
 /**
+ * Fetch current prices for a list of tickers
+ * Uses the market-data API to get the most recent close price
+ */
+async function fetchCurrentPrices(tickers: string[]): Promise<Map<string, number>> {
+  const prices = new Map<string, number>();
+  const failed: string[] = [];
+
+  if (tickers.length === 0) {
+    return prices;
+  }
+
+  console.log(`[Pipeline] Fetching current prices for ${tickers.length} tickers: ${tickers.join(', ')}`);
+
+  // Fetch prices in parallel (limit concurrency to avoid rate limits)
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
+    const batch = tickers.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async (ticker) => {
+        try {
+          const bars = await fetchOHLCData(ticker, 5); // Just need recent price
+          if (bars.length > 0) {
+            // Get the most recent close price
+            const lastBar = bars[bars.length - 1];
+            console.log(`[Pipeline] ${ticker}: fetched price $${lastBar.close.toFixed(2)}`);
+            return { ticker, price: lastBar.close };
+          } else {
+            console.warn(`[Pipeline] ${ticker}: no OHLC data returned`);
+            failed.push(ticker);
+          }
+        } catch (error) {
+          console.warn(`[Pipeline] ${ticker}: fetch error:`, error);
+          failed.push(ticker);
+        }
+        return null;
+      })
+    );
+
+    for (const result of results) {
+      if (result) {
+        prices.set(result.ticker, result.price);
+      }
+    }
+  }
+
+  console.log(`[Pipeline] Fetched prices for ${prices.size}/${tickers.length} tickers`);
+  if (failed.length > 0) {
+    console.warn(`[Pipeline] Failed to fetch prices for: ${failed.join(', ')}`);
+  }
+  return prices;
+}
+
+/**
+ * Apply current market prices to positions
+ */
+function applyCurrentPrices(positions: RawPosition[], prices: Map<string, number>): RawPosition[] {
+  return positions.map(pos => {
+    const currentPrice = prices.get(pos.ticker);
+    if (currentPrice !== undefined) {
+      return {
+        ...pos,
+        last_price: currentPrice,
+      };
+    }
+    return pos;
+  });
+}
+
+/**
  * Load positions from Supabase, return empty array if unavailable
  */
 async function loadPositionsFromDatabase(): Promise<RawPosition[]> {
@@ -976,7 +932,16 @@ async function loadPositionsFromDatabase(): Promise<RawPosition[]> {
   try {
     const rows = await getPositions();
     console.log(`[Pipeline] Loaded ${rows.length} positions from Supabase`);
-    return rows.map(convertPositionRowToRawPosition);
+    const positions = rows.map(convertPositionRowToRawPosition);
+
+    // Fetch and apply current market prices
+    if (positions.length > 0) {
+      const tickers = positions.map(p => p.ticker);
+      const prices = await fetchCurrentPrices(tickers);
+      return applyCurrentPrices(positions, prices);
+    }
+
+    return positions;
   } catch (error) {
     console.error('[Pipeline] Failed to load positions:', error);
     return [];
@@ -1674,6 +1639,34 @@ export async function saveTradeToDatabase(trade: TradeInput): Promise<TradeRow |
           console.error(`[Pipeline] Failed to create position for ${trade.ticker}:`, posError);
           // Don't fail the trade save if position creation fails
         }
+      }
+    }
+
+    // For ADD trades, update the existing position with more shares
+    if (trade.action_type === 'ADD' && trade.side === 'BUY') {
+      try {
+        const position = await getPositionByTicker(trade.ticker);
+        if (position) {
+          // Calculate new weighted average price
+          const totalShares = position.shares + trade.shares;
+          const totalCost = (position.shares * position.avg_price) + (trade.shares * trade.price);
+          const newAvgPrice = totalCost / totalShares;
+
+          await updatePosition(trade.ticker, {
+            shares: totalShares,
+            avg_price: newAvgPrice,
+            // Update SSL if provided, otherwise keep existing
+            ssl: trade.ssl ?? position.ssl,
+            // Recalculate 2R target based on new avg price and SSL
+            trim_2r_price: trade.trim_2r_price ?? (trade.ssl ? newAvgPrice + 2 * (newAvgPrice - trade.ssl) : position.trim_2r_price),
+          });
+          console.log(`[Pipeline] Position updated for ${trade.ticker}: ${totalShares} shares @ $${newAvgPrice.toFixed(2)} avg`);
+        } else {
+          console.warn(`[Pipeline] ADD trade but no existing position for ${trade.ticker}`);
+        }
+      } catch (posError) {
+        console.error(`[Pipeline] Failed to update position for ${trade.ticker}:`, posError);
+        // Don't fail the trade save if position update fails
       }
     }
 

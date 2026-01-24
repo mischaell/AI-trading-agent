@@ -536,9 +536,6 @@ export function analyzeMarketState(
     mcsiVs10dma
   );
 
-  // Get permissions for state
-  const permissions = getPermissionsForState(state);
-
   // Calculate breadth direction if raw values are provided
   const mcoValue = breadth.mco_value ?? undefined;
   const mcoValuePrev = breadth.mco_value_prev ?? undefined;
@@ -554,6 +551,15 @@ export function analyzeMarketState(
     mcoChange = mcoValue - mcoValuePrev;
     breadthDirection = calculateBreadthDirection(mcoChange);
     breadthMultiplier = getBreadthMultiplier(breadthDirection, mcoZ.toNumber());
+  }
+
+  // Get permissions for state
+  const permissions = getPermissionsForState(state);
+
+  // Override: Disable pressing when breadth is contracting, even in confirmed uptrend
+  // Per Alex: Pressing requires BOTH structure confirmation AND healthy breadth
+  if (breadthDirection === 'CONTRACTING' || breadthDirection === 'HOOK_DOWN') {
+    permissions.pressing = false;
   }
 
   if (mcsiValue !== undefined && mcsiValuePrev !== undefined) {

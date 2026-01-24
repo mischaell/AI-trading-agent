@@ -4,18 +4,33 @@
  * POST /api/discord/sync
  * Triggers a sync of Discord channels to import historical messages.
  *
+ * NOTE: This endpoint does not work on Vercel (serverless) due to WebSocket limitations.
+ * Use this locally or on a server that supports persistent connections.
+ *
  * Query params:
  * - channel: specific channel to sync (equity-trades, alex-journal, pf-update, all)
  * - limit: max messages to fetch (default 100)
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createDiscordBot, DiscordBot } from "@/lib/discord/client";
+
+// Check if we're running on Vercel (serverless)
+const isVercel = process.env.VERCEL === '1';
+
+// Dynamic import to avoid build issues on Vercel
+let createDiscordBot: typeof import("@/lib/discord/client").createDiscordBot | null = null;
+type DiscordBot = import("@/lib/discord/client").DiscordBot;
 
 // Singleton bot instance for API calls
 let bot: DiscordBot | null = null;
 
 async function getBot(): Promise<DiscordBot> {
+  // Dynamically import discord client (only works locally, not on Vercel)
+  if (!createDiscordBot) {
+    const module = await import("@/lib/discord/client");
+    createDiscordBot = module.createDiscordBot;
+  }
+
   if (!bot) {
     bot = createDiscordBot();
     await bot.connect();
@@ -35,6 +50,17 @@ async function getBot(): Promise<DiscordBot> {
 }
 
 export async function POST(request: NextRequest) {
+  // Discord sync doesn't work on Vercel due to WebSocket limitations
+  if (isVercel) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Discord sync is not available on Vercel. Use local development or a dedicated server.",
+      },
+      { status: 501 }
+    );
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const channel = searchParams.get("channel") || "all";
@@ -116,6 +142,16 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  // Discord sync doesn't work on Vercel
+  if (isVercel) {
+    return NextResponse.json({
+      success: true,
+      connected: false,
+      status: null,
+      message: "Discord sync is not available on Vercel.",
+    });
+  }
+
   try {
     // Return sync status
     if (bot && bot.isConnected()) {

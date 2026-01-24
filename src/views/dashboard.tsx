@@ -17,6 +17,7 @@ import { MarketStateStrip, MarketPermissions } from "@/components/market-state-s
 import { TopNav, NavItem } from "@/components/top-nav";
 import { TickerChartModal } from "@/components/ticker-chart-modal";
 import { SellModal } from "@/components/sell-modal";
+import { AddTradeModal } from "@/components/add-trade-modal";
 import { Button } from "@/components/ui/button";
 import { PortfolioPosition, TrimRecommendation } from "@/types";
 
@@ -1045,8 +1046,17 @@ function BreadthUpload({
 // Loading Spinner with Progress
 // =============================================================================
 
+const LOADING_MESSAGES = [
+  { headline: "Identifying State of the Market", subheadline: "To trade or not to trade?" },
+  { headline: "Finding the Leading Stocks", subheadline: "What should I trade?" },
+  { headline: "Looking at Risk versus Return", subheadline: "Where should I enter today?" },
+  { headline: "Suggesting the 5 Best Trades", subheadline: "Which ones should go into my portfolio?" },
+  { headline: "Updating my Current Portfolio", subheadline: "Am I turning a profit?" },
+];
+
 function LoadingSpinner({ progress }: { progress: PipelineProgress | null }) {
   const [elapsed, setElapsed] = useState(0);
+  const [messageIndex, setMessageIndex] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1055,9 +1065,16 @@ function LoadingSpinner({ progress }: { progress: PipelineProgress | null }) {
     return () => clearInterval(timer);
   }, []);
 
+  // Cycle through messages every 4 seconds
+  useEffect(() => {
+    const messageTimer = setInterval(() => {
+      setMessageIndex(i => (i + 1) % LOADING_MESSAGES.length);
+    }, 4000);
+    return () => clearInterval(messageTimer);
+  }, []);
+
   const progressPct = progress?.progress ?? 0;
-  const taskName = progress?.task ?? 'Initializing';
-  const message = progress?.message ?? 'Starting pipeline...';
+  const currentMessage = LOADING_MESSAGES[messageIndex];
 
   return (
     <div className="flex min-h-[400px] items-center justify-center">
@@ -1078,15 +1095,15 @@ function LoadingSpinner({ progress }: { progress: PipelineProgress | null }) {
           />
         </div>
 
-        {/* Task info */}
-        <div className="text-center">
-          <div className="text-sm font-medium text-zinc-900">{taskName}</div>
-          <div className="text-xs text-zinc-500 mt-1">{message}</div>
+        {/* Rotating messages */}
+        <div className="text-center h-16">
+          <div className="text-xl font-bold text-zinc-900">{currentMessage.headline}</div>
+          <div className="text-base text-zinc-500 mt-1">{currentMessage.subheadline}</div>
         </div>
 
         {/* Elapsed time */}
         <div className="text-xs text-zinc-400 mt-2">
-          Elapsed: {elapsed}s • Estimated: 60-90s
+          Elapsed: {elapsed}s
         </div>
       </div>
     </div>
@@ -1307,6 +1324,15 @@ function ViewMarketState({ state }: { state: AgentState }) {
                 Current State: {t.state.replace(/_/g, ' ')}
               </Pill>
               <Pill>{t.market} | {t.breadth_universe}</Pill>
+              {t.breadth_direction && (
+                <Pill tone={
+                  t.breadth_direction === 'HOOK_UP' || t.breadth_direction === 'EXPANDING' ? 'good' :
+                  t.breadth_direction === 'CONTRACTING' || t.breadth_direction === 'HOOK_DOWN' ? 'warn' :
+                  'neutral'
+                }>
+                  Breadth: {t.breadth_direction.replace(/_/g, ' ')}
+                </Pill>
+              )}
             </div>
 
             <Table>
@@ -2162,35 +2188,66 @@ function ViewTradesToday({ state, onTickerClick }: { state: AgentState; onTicker
 function ViewPortfolio({
   state,
   onTickerClick,
-  onTrimPosition,
   onSellPosition,
+  onAddTrade,
+  accountEquity,
+  isEditingEquity,
+  equityInput,
+  onEquityInputChange,
+  onEquitySave,
+  onEquityEdit,
 }: {
   state: AgentState;
   onTickerClick?: (ticker: string) => void;
-  onTrimPosition?: (position: PortfolioPosition) => Promise<void>;
   onSellPosition?: (position: PortfolioPosition) => void;
+  onAddTrade?: () => void;
+  accountEquity: number;
+  isEditingEquity: boolean;
+  equityInput: string;
+  onEquityInputChange: (value: string) => void;
+  onEquitySave: () => void;
+  onEquityEdit: () => void;
 }) {
   const portfolio = state.portfolio;
   const { summary, positions } = portfolio;
 
-  // Track executing trim actions
-  const [executingTrims, setExecutingTrims] = useState<Record<string, boolean>>({});
-
-  const handleTrim = async (position: PortfolioPosition) => {
-    if (executingTrims[position.ticker] || !onTrimPosition) return;
-    setExecutingTrims(prev => ({ ...prev, [position.ticker]: true }));
-    try {
-      await onTrimPosition(position);
-    } finally {
-      setExecutingTrims(prev => ({ ...prev, [position.ticker]: false }));
-    }
-  };
-
   const totals = useMemo(() => {
     const invested = positions.reduce((acc, p) => acc + (p.value ?? 0), 0);
-    const equity = summary.equity ?? 100000;
-    const unrealDollars = (summary.open_heat / 100) * equity;
-    return { invested, unrealDollars };
+    const equity = accountEquity;
+
+    // Calculate unrealized P&L per position (current value - cost basis)
+    const unrealizedByPosition = positions.map(p => {
+      const shares = p.shares ?? 0;
+      const lastPrice = p.last_price ?? p.entry;
+      const costBasis = shares * p.entry;
+      const currentValue = shares * lastPrice;
+      return {
+        ticker: p.ticker,
+        unrealized: currentValue - costBasis,
+      };
+    });
+    const totalUnrealized = unrealizedByPosition.reduce((acc, p) => acc + p.unrealized, 0);
+
+    // Calculate realized P&L per position (from secured_pnl as % of equity)
+    const realizedByPosition = positions.map(p => {
+      const realizedPct = p.secured_pnl ?? 0;
+      return {
+        ticker: p.ticker,
+        realized: (realizedPct / 100) * equity,
+      };
+    });
+    const totalRealized = realizedByPosition.reduce((acc, p) => acc + p.realized, 0);
+
+    const totalPnl = totalUnrealized + totalRealized;
+
+    return {
+      invested,
+      unrealizedByPosition,
+      realizedByPosition,
+      totalUnrealized,
+      totalRealized,
+      totalPnl,
+    };
   }, [positions, summary]);
 
   const asOfDisplay = portfolio.as_of
@@ -2204,17 +2261,38 @@ function ViewPortfolio({
         <CardContent className="py-3">
           <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap">
             <Pill>As of {asOfDisplay}</Pill>
-            <Pill>Equity <span className="font-bold">{fmtUsd(summary.equity ?? 0)}</span></Pill>
-            <Pill>Cash <span className="font-bold">{fmtUsd(summary.cash ?? 0)}</span></Pill>
-            <Pill>Invested <span className="font-bold">{fmtUsd(totals.invested)}</span></Pill>
-            <Pill>Gross Exposure <span className="font-bold">{summary.gross_exposure.toFixed(1)}%</span></Pill>
-            <Pill>NER <span className="font-bold">{summary.ner.toFixed(2)}%</span></Pill>
-            <Pill>Positions <span className="font-bold">{summary.position_count}</span></Pill>
-            <Pill tone={toneForPnl(summary.open_heat)}>
-              Open Heat <span className="font-bold">{summary.open_heat >= 0 ? '+' : ''}{summary.open_heat.toFixed(2)}%</span>
+            <Pill>
+              Equity{' '}
+              {isEditingEquity ? (
+                <input
+                  type="number"
+                  value={equityInput}
+                  onChange={(e) => onEquityInputChange(e.target.value)}
+                  onBlur={onEquitySave}
+                  onKeyDown={(e) => e.key === 'Enter' && onEquitySave()}
+                  className="w-20 bg-transparent font-bold text-right border-b border-zinc-400 outline-none"
+                  autoFocus
+                />
+              ) : (
+                <span
+                  className="font-bold cursor-pointer hover:underline"
+                  onClick={onEquityEdit}
+                  title="Click to edit"
+                >
+                  {fmtUsd(accountEquity)}
+                </span>
+              )}
             </Pill>
-            <Pill tone={toneForPnl(summary.secured_profits)}>
-              Secured <span className="font-bold">{summary.secured_profits >= 0 ? '+' : ''}{summary.secured_profits.toFixed(2)}%</span>
+            <Pill>Cash <span className="font-bold">{fmtUsd(accountEquity - totals.invested)}</span></Pill>
+            <Pill>Invested <span className="font-bold">{fmtUsd(totals.invested)}</span></Pill>
+            <Pill>Gross Exposure <span className="font-bold">{((totals.invested / accountEquity) * 100).toFixed(1)}%</span></Pill>
+            <Pill>NER <span className="font-bold">{((totals.totalUnrealized / accountEquity) * 100).toFixed(2)}%</span></Pill>
+            <Pill>Positions <span className="font-bold">{positions.length}</span></Pill>
+            <Pill tone={toneForPnl(totals.totalUnrealized)}>
+              Open Heat <span className="font-bold">{totals.totalUnrealized >= 0 ? '+' : ''}{((totals.totalUnrealized / accountEquity) * 100).toFixed(2)}%</span>
+            </Pill>
+            <Pill tone={toneForPnl(totals.totalRealized)}>
+              Secured <span className="font-bold">{totals.totalRealized >= 0 ? '+' : ''}{((totals.totalRealized / accountEquity) * 100).toFixed(2)}%</span>
             </Pill>
           </div>
         </CardContent>
@@ -2222,35 +2300,42 @@ function ViewPortfolio({
 
       {/* Positions table */}
       <Card className="mt-4 rounded-2xl shadow-sm">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm">Open Positions</CardTitle>
+          {onAddTrade && (
+            <Button size="sm" onClick={onAddTrade} className="h-7 text-xs">
+              + Add Trade
+            </Button>
+          )}
         </CardHeader>
 
         <CardContent>
-          <Table>
+          <Table className="text-xs">
             <TableHeader>
               <TableRow>
-                <TableHead>Ticker</TableHead>
-                <TableHead className="text-right">R</TableHead>
-                <TableHead className="text-right">Heat</TableHead>
-                <TableHead className="text-right">Shares</TableHead>
-                <TableHead className="text-right">Entry</TableHead>
-                <TableHead className="text-right">Last</TableHead>
-                <TableHead className="text-right">SSL</TableHead>
-                <TableHead className="text-right">SSL %</TableHead>
-                <TableHead className="text-right">2R</TableHead>
-                <TableHead className="text-right">Trim</TableHead>
-                <TableHead className="text-right">Weight</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-                <TableHead className="text-right">E(d)</TableHead>
-                <TableHead className="text-center">Actions</TableHead>
+                <TableHead className="text-xs">Ticker</TableHead>
+                <TableHead className="text-xs text-right">R</TableHead>
+                <TableHead className="text-xs text-right">Heat</TableHead>
+                <TableHead className="text-xs text-right">Shrs</TableHead>
+                <TableHead className="text-xs text-right">Entry</TableHead>
+                <TableHead className="text-xs text-right">Last</TableHead>
+                <TableHead className="text-xs text-right">SSL</TableHead>
+                <TableHead className="text-xs text-right">SSL%</TableHead>
+                <TableHead className="text-xs text-right">2R</TableHead>
+                <TableHead className="text-xs text-right">Trim</TableHead>
+                <TableHead className="text-xs text-right">Wt%</TableHead>
+                <TableHead className="text-xs text-right">Value</TableHead>
+                <TableHead className="text-xs text-right">UR P&L</TableHead>
+                <TableHead className="text-xs text-right">R P&L</TableHead>
+                <TableHead className="text-xs text-right">E(d)</TableHead>
+                <TableHead className="text-xs text-center">Act</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {positions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center text-zinc-500 py-8">
+                  <TableCell colSpan={16} className="text-center text-zinc-500 py-8">
                     No open positions
                   </TableCell>
                 </TableRow>
@@ -2261,7 +2346,8 @@ function ViewPortfolio({
                   const lastPrice = p.last_price ?? p.entry;
                   const sslDistPct = ((lastPrice - p.ssl) / lastPrice) * 100;
                   const trim2r = p.trim_2r_price ?? 0;
-                  const canTrim = rMultiple >= 2 && p.trimmed < 33;
+                  const urPnl = totals.unrealizedByPosition.find(x => x.ticker === p.ticker)?.unrealized ?? 0;
+                  const rPnl = totals.realizedByPosition.find(x => x.ticker === p.ticker)?.realized ?? 0;
                   return (
                     <TableRow key={p.ticker}>
                       <TableCell>
@@ -2272,13 +2358,13 @@ function ViewPortfolio({
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Pill tone={rMultiple >= 2 ? "good" : rMultiple < 0 ? "warn" : "neutral"}>
-                          {rMultiple >= 0 ? '+' : ''}{rMultiple.toFixed(1)}R
+                        <Pill tone={rMultiple >= 2 ? "good" : rMultiple < -0.05 ? "warn" : "neutral"}>
+                          {rMultiple > 0.005 ? '+' : ''}{rMultiple.toFixed(1)}R
                         </Pill>
                       </TableCell>
                       <TableCell className="text-right">
                         <Pill tone={toneForPnl(openHeat)}>
-                          {openHeat >= 0 ? '+' : ''}{openHeat.toFixed(1)}%
+                          {openHeat > 0.005 ? '+' : ''}{openHeat.toFixed(1)}%
                         </Pill>
                       </TableCell>
                       <TableCell className="text-right font-mono">{p.shares}</TableCell>
@@ -2294,7 +2380,7 @@ function ViewPortfolio({
                       <TableCell className="text-right">
                         {p.trimmed > 0 ? (
                           <Pill tone="good">{p.trimmed.toFixed(0)}%</Pill>
-                        ) : canTrim ? (
+                        ) : p.trim_available ? (
                           <Pill tone="good">Ready</Pill>
                         ) : (
                           <span className="text-zinc-400">—</span>
@@ -2302,33 +2388,26 @@ function ViewPortfolio({
                       </TableCell>
                       <TableCell className="text-right font-mono">{p.weight.toFixed(1)}%</TableCell>
                       <TableCell className="text-right font-mono">{fmtUsd(p.value ?? 0)}</TableCell>
+                      <TableCell className={`text-right font-mono ${urPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {urPnl >= 0 ? '+' : ''}{fmtUsd(urPnl)}
+                      </TableCell>
+                      <TableCell className={`text-right font-mono ${rPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {rPnl > 0 ? '+' + fmtUsd(rPnl) : rPnl < 0 ? fmtUsd(rPnl) : '—'}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Pill tone={toneForEarnings(p.earnings_days ?? 999)}>
                           {p.earnings_days ?? '—'}
                         </Pill>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {canTrim && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleTrim(p)}
-                              disabled={executingTrims[p.ticker]}
-                              className="h-7 px-2 text-xs"
-                            >
-                              {executingTrims[p.ticker] ? '...' : 'Trim'}
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => onSellPosition?.(p)}
-                            className="h-7 px-2 text-xs"
-                          >
-                            Sell
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => onSellPosition?.(p)}
+                          className="h-6 px-1.5 text-[10px]"
+                        >
+                          Sell
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -2336,8 +2415,41 @@ function ViewPortfolio({
             </TableBody>
           </Table>
 
+          {/* P&L Summary */}
+          <div className="mt-4 flex justify-end">
+            <div className="grid grid-cols-3 gap-4 text-xs border rounded-lg p-3 bg-zinc-50">
+              <div className="text-center">
+                <div className="text-zinc-500 mb-1">Unrealized P&L</div>
+                <div className={`font-mono font-bold ${totals.totalUnrealized >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {totals.totalUnrealized >= 0 ? '+' : ''}{fmtUsd(totals.totalUnrealized)}
+                  <span className="text-zinc-500 font-normal ml-1">
+                    ({totals.totalUnrealized >= 0 ? '+' : ''}{((totals.totalUnrealized / (summary.equity ?? 100000)) * 100).toFixed(2)}%)
+                  </span>
+                </div>
+              </div>
+              <div className="text-center border-x px-4">
+                <div className="text-zinc-500 mb-1">Realized P&L</div>
+                <div className={`font-mono font-bold ${totals.totalRealized >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {totals.totalRealized > 0 ? '+' + fmtUsd(totals.totalRealized) : totals.totalRealized < 0 ? fmtUsd(totals.totalRealized) : '$0'}
+                  <span className="text-zinc-500 font-normal ml-1">
+                    ({totals.totalRealized >= 0 ? '+' : ''}{((totals.totalRealized / (summary.equity ?? 100000)) * 100).toFixed(2)}%)
+                  </span>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-zinc-500 mb-1">Total P&L</div>
+                <div className={`font-mono font-bold ${totals.totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {totals.totalPnl >= 0 ? '+' : ''}{fmtUsd(totals.totalPnl)}
+                  <span className="text-zinc-500 font-normal ml-1">
+                    ({totals.totalPnl >= 0 ? '+' : ''}{((totals.totalPnl / (summary.equity ?? 100000)) * 100).toFixed(2)}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="mt-3 text-xs text-zinc-500">
-            Contract notes: Stops are close-based vs 21EMA low band (SSL). Status: STARTER (&lt;1R), CORE (1-2R), RUNNER (≥2R).
+            UR P&L = Unrealized (open position gain/loss). R P&L = Realized (from trims/sells). SSL = 21EMA low band stop.
           </div>
         </CardContent>
       </Card>
@@ -2364,6 +2476,14 @@ export default function TradingAgentDashboard() {
   const [sellPosition, setSellPosition] = useState<PortfolioPosition | null>(null);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
 
+  // Add Trade modal state
+  const [isAddTradeModalOpen, setIsAddTradeModalOpen] = useState(false);
+
+  // Account equity (editable) - cash is calculated as equity - invested
+  const [accountEquity, setAccountEquity] = useState(100000);
+  const [isEditingEquity, setIsEditingEquity] = useState(false);
+  const [equityInput, setEquityInput] = useState("100000");
+
   const handleTickerClick = (ticker: string) => {
     setSelectedTicker(ticker);
     setIsChartModalOpen(true);
@@ -2387,10 +2507,11 @@ export default function TradingAgentDashboard() {
   // Helper to refresh portfolio after trade execution
   const refreshPortfolio = async () => {
     try {
-      const updatedPortfolio = await refreshPortfolioOnly(
-        agentState?.portfolio?.summary?.equity ?? 100000,
-        agentState?.portfolio?.summary?.cash ?? 50000
-      );
+      // Calculate cash as equity - invested
+      const invested = agentState?.portfolio?.positions?.reduce((acc, p) => acc + (p.value ?? 0), 0) ?? 0;
+      const cash = accountEquity - invested;
+
+      const updatedPortfolio = await refreshPortfolioOnly(accountEquity, cash);
       if (agentState) {
         setAgentState({
           ...agentState,
@@ -2400,31 +2521,6 @@ export default function TradingAgentDashboard() {
     } catch (err) {
       console.error('[Dashboard] Failed to refresh portfolio:', err);
     }
-  };
-
-  // Trim handler - trims 1/3 of position at current price
-  const handleTrimPosition = async (position: PortfolioPosition) => {
-    const sharesToSell = Math.floor((position.shares ?? 0) / 3);
-    const currentPrice = position.last_price ?? position.entry;
-
-    const trade: TradeInput = {
-      ticker: position.ticker,
-      side: 'SELL',
-      action_type: 'TRIM',
-      shares: sharesToSell,
-      price: currentPrice,
-      r_multiple: position.total_r,
-      mode: position.mode,
-      notes: `Trim 1/3 at ${(position.total_r ?? 0).toFixed(2)}R. Entry: $${position.entry.toFixed(2)}, SSL: $${position.ssl.toFixed(2)}`,
-    };
-
-    const result = await saveTradeToDatabase(trade);
-    if (!result) {
-      throw new Error('Failed to save trim trade');
-    }
-
-    // Refresh portfolio after successful trim
-    await refreshPortfolio();
   };
 
   // Trim handler for TrimRecommendation (from Suggested Trades view)
@@ -2478,13 +2574,38 @@ export default function TradingAgentDashboard() {
     await refreshPortfolio();
   };
 
+  // Add Trade handler - creates new position or adds to existing
+  const handleAddTrade = async (trade: TradeInput) => {
+    const result = await saveTradeToDatabase(trade);
+    if (!result) {
+      throw new Error('Failed to save trade');
+    }
+
+    // Refresh portfolio after successful trade
+    await refreshPortfolio();
+  };
+
+  // Equity editing handlers
+  const handleEquityEdit = () => {
+    setEquityInput(accountEquity.toString());
+    setIsEditingEquity(true);
+  };
+
+  const handleEquitySave = () => {
+    const newEquity = parseFloat(equityInput);
+    if (!isNaN(newEquity) && newEquity > 0) {
+      setAccountEquity(newEquity);
+    }
+    setIsEditingEquity(false);
+  };
+
   // Run pipeline on mount
   useEffect(() => {
     const runPipeline = async () => {
       try {
         const state = await runAgentPipeline({
-          equity: 100000,
-          cash: 50000,
+          equity: accountEquity,
+          cash: accountEquity, // Will be recalculated based on positions
           onProgress: (progress) => {
             setPipelineProgress({ ...progress });
           },
@@ -2516,8 +2637,8 @@ export default function TradingAgentDashboard() {
 
     try {
       const state = await runAgentPipeline({
-        equity: 100000,
-        cash: 50000,
+        equity: accountEquity,
+        cash: accountEquity, // Will be recalculated based on positions
         forceRefresh: true,
         onProgress: (progress) => {
           console.log('[Dashboard] EOD Progress:', progress.task, progress.progress + '%');
@@ -2580,7 +2701,20 @@ export default function TradingAgentDashboard() {
           {active === "Focus List" && <ViewFocusList state={agentState} onTickerClick={handleTickerClick} />}
           {active === "Suggested Trades" && <ViewSuggestedTrades state={agentState} onTickerClick={handleTickerClick} onTrim={handleTrimRecommendation} />}
           {active === "Trades Today" && <ViewTradesToday state={agentState} onTickerClick={handleTickerClick} />}
-          {active === "Portfolio" && <ViewPortfolio state={agentState} onTickerClick={handleTickerClick} onTrimPosition={handleTrimPosition} onSellPosition={handleOpenSellModal} />}
+          {active === "Portfolio" && (
+                <ViewPortfolio
+                  state={agentState}
+                  onTickerClick={handleTickerClick}
+                  onSellPosition={handleOpenSellModal}
+                  onAddTrade={() => setIsAddTradeModalOpen(true)}
+                  accountEquity={accountEquity}
+                  isEditingEquity={isEditingEquity}
+                  equityInput={equityInput}
+                  onEquityInputChange={setEquityInput}
+                  onEquitySave={handleEquitySave}
+                  onEquityEdit={handleEquityEdit}
+                />
+              )}
         </>
       ) : (
         <div className="flex min-h-[400px] items-center justify-center">
@@ -2604,6 +2738,17 @@ export default function TradingAgentDashboard() {
         onClose={handleCloseSellModal}
         onConfirm={handleSellShares}
       />
+
+      {/* Add Trade Modal */}
+      {agentState && (
+        <AddTradeModal
+          isOpen={isAddTradeModalOpen}
+          onClose={() => setIsAddTradeModalOpen(false)}
+          onConfirm={handleAddTrade}
+          existingPositions={agentState.portfolio.positions}
+          equity={accountEquity}
+        />
+      )}
     </div>
   );
 }

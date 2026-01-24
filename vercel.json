@@ -1,0 +1,25 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "functions": {
+    "src/app/api/rs-data/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/universe-data/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/market-data/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/gmail/import/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/extract-breadth/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key"
+  }
+}
