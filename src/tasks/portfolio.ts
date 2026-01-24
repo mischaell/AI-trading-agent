@@ -29,6 +29,7 @@ import {
   PortfolioSummary,
   PortfolioPosition,
   PositionStatus,
+  TrimRecommendation,
 } from '@/types';
 
 // =============================================================================
@@ -436,6 +437,49 @@ export function calculatePortfolioSummary(
 }
 
 // =============================================================================
+// Trim Recommendations
+// =============================================================================
+
+/**
+ * Generate trim recommendations for positions at 2R profit target
+ *
+ * Scans portfolio for positions where:
+ * - R multiple >= 2.0
+ * - Less than 33% already trimmed
+ *
+ * Returns recommendations sorted by R multiple (highest first)
+ */
+export function generateTrimRecommendations(
+  positions: PortfolioPosition[],
+  equity: number
+): TrimRecommendation[] {
+  return positions
+    .filter(p => p.trim_available === true)
+    .map(p => {
+      const sharesToSell = Math.floor((p.shares ?? 0) / 3);
+      const currentPrice = p.last_price ?? p.entry;
+      const pnlPerShare = currentPrice - p.entry;
+      const potentialPnl = sharesToSell * pnlPerShare;
+
+      return {
+        ticker: p.ticker,
+        action_type: 'TRIM' as const,
+        shares_to_sell: sharesToSell,
+        current_shares: p.shares ?? 0,
+        entry_price: p.entry,
+        current_price: currentPrice,
+        trim_price: p.trim_2r_price ?? p.entry,
+        ssl: p.ssl,
+        current_r: p.total_r ?? 0,
+        potential_pnl: potentialPnl,
+        potential_pnl_pct: equity > 0 ? (potentialPnl / equity) * 100 : 0,
+        position: p,
+      };
+    })
+    .sort((a, b) => b.current_r - a.current_r); // Highest R first
+}
+
+// =============================================================================
 // Main Export
 // =============================================================================
 
@@ -485,6 +529,12 @@ export function calculatePortfolio(
   // Calculate summary aggregates
   const summary = calculatePortfolioSummary(portfolioPositions, account);
 
+  // Generate trim recommendations for positions at 2R
+  const trimRecommendations = generateTrimRecommendations(
+    portfolioPositions,
+    account.equity
+  );
+
   // Generate timestamp
   const asOf = new Date().toISOString();
 
@@ -492,6 +542,7 @@ export function calculatePortfolio(
     task: 'portfolio',
     summary,
     positions: portfolioPositions,
+    trim_recommendations: trimRecommendations,
     as_of: asOf,
   };
 }

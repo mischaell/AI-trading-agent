@@ -100,6 +100,9 @@ import {
   getRecentTrades,
   insertTrade,
   upsertPosition,
+  updatePosition,
+  deletePosition,
+  getPositionByTicker,
   getTodayDate,
   PositionRow,
   PositionInsert,
@@ -1671,6 +1674,50 @@ export async function saveTradeToDatabase(trade: TradeInput): Promise<TradeRow |
           console.error(`[Pipeline] Failed to create position for ${trade.ticker}:`, posError);
           // Don't fail the trade save if position creation fails
         }
+      }
+    }
+
+    // For TRIM/EXIT trades, update/delete the position
+    if ((trade.action_type === 'TRIM' || trade.action_type === 'EXIT') && trade.side === 'SELL') {
+      try {
+        const position = await getPositionByTicker(trade.ticker);
+        if (position) {
+          const newShares = position.shares - trade.shares;
+
+          if (newShares <= 0 || trade.action_type === 'EXIT') {
+            // Full exit - delete position
+            await deletePosition(trade.ticker);
+            console.log(`[Pipeline] Position deleted for ${trade.ticker} (full exit)`);
+          } else {
+            // Partial trim - update position
+            // Calculate new trimmed percentage based on original shares
+            // Original shares = current shares + already trimmed shares
+            const alreadyTrimmedShares = (position.trimmed_pct / 100) * position.shares / (1 - position.trimmed_pct / 100);
+            const originalShares = position.shares + alreadyTrimmedShares;
+            const newTrimmedPct = originalShares > 0
+              ? ((originalShares - newShares) / originalShares) * 100
+              : position.trimmed_pct;
+
+            // Calculate P&L from the trim
+            const trimPnl = (trade.price - position.avg_price) * trade.shares;
+
+            // Determine new status based on trimmed percentage
+            const newStatus = newTrimmedPct >= 33 ? 'RUNNER' : position.status;
+
+            await updatePosition(trade.ticker, {
+              shares: newShares,
+              trimmed_pct: Math.min(100, newTrimmedPct),
+              secured_pnl: (position.secured_pnl ?? 0) + trimPnl,
+              status: newStatus,
+            });
+            console.log(`[Pipeline] Position updated for ${trade.ticker}: ${newShares} shares, ${newTrimmedPct.toFixed(1)}% trimmed`);
+          }
+        } else {
+          console.warn(`[Pipeline] Position not found for ${trade.ticker}, cannot update`);
+        }
+      } catch (posError) {
+        console.error(`[Pipeline] Failed to update position for ${trade.ticker}:`, posError);
+        // Don't fail the trade save if position update fails
       }
     }
 

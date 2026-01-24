@@ -77,6 +77,7 @@ export type {
   PortfolioSummary,
   PortfolioPosition,
   PortfolioOutput,
+  TrimRecommendation,
 } from './portfolio';
 
 // Task 9 — Trades Today / Overview

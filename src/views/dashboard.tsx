@@ -16,6 +16,9 @@ import { MiniBarTile, BarTone } from "@/components/mini-bar-tile";
 import { MarketStateStrip, MarketPermissions } from "@/components/market-state-strip";
 import { TopNav, NavItem } from "@/components/top-nav";
 import { TickerChartModal } from "@/components/ticker-chart-modal";
+import { SellModal } from "@/components/sell-modal";
+import { Button } from "@/components/ui/button";
+import { PortfolioPosition, TrimRecommendation } from "@/types";
 
 // Pipeline imports
 import { runAgentPipeline, AgentState, saveTradeToDatabase, TradeInput, PipelineProgress, clearPipelineCache } from "@/lib/agent-pipeline";
@@ -1633,10 +1636,19 @@ function ViewFocusList({ state, onTickerClick }: { state: AgentState; onTickerCl
   );
 }
 
-function ViewSuggestedTrades({ state, onTickerClick }: { state: AgentState; onTickerClick?: (ticker: string) => void }) {
+function ViewSuggestedTrades({
+  state,
+  onTickerClick,
+  onTrim,
+}: {
+  state: AgentState;
+  onTickerClick?: (ticker: string) => void;
+  onTrim?: (rec: TrimRecommendation) => Promise<void>;
+}) {
   const plan = state.executionPlan;
   const marketState = state.marketState;
   const { passed, withheld, totals } = plan;
+  const trimRecommendations = state.portfolio?.trim_recommendations ?? [];
   // Get all sizing candidates, prioritizing PASS over WITHHOLD
   const rawCandidates = state.sizing?.sizing ?? [];
   // Sort: PASS candidates first (by score), then WITHHOLD candidates (by score)
@@ -1657,9 +1669,11 @@ function ViewSuggestedTrades({ state, onTickerClick }: { state: AgentState; onTi
 
   // Track executed trades by ticker
   const [executedTrades, setExecutedTrades] = useState<Record<string, 'executing' | 'success' | 'error'>>({});
+  const [executedTrims, setExecutedTrims] = useState<Record<string, 'executing' | 'success' | 'error'>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Ref for immediate click blocking (state updates are async)
   const executingRef = useRef<Set<string>>(new Set());
+  const trimExecutingRef = useRef<Set<string>>(new Set());
 
   const handleExecuteTrade = async (order: typeof passed[0]) => {
     // Prevent double execution - use ref for immediate blocking
@@ -1703,6 +1717,33 @@ function ViewSuggestedTrades({ state, onTickerClick }: { state: AgentState; onTi
     if (status === 'success') return { text: 'Executed', disabled: true, className: 'bg-green-600' };
     if (status === 'error') return { text: 'Retry', disabled: false, className: 'bg-red-600 hover:bg-red-700' };
     return { text: 'Execute', disabled: false, className: 'bg-blue-600 hover:bg-blue-700' };
+  };
+
+  const getTrimButtonState = (ticker: string) => {
+    const status = executedTrims[ticker];
+    if (status === 'executing') return { text: 'Trimming...', disabled: true, className: 'bg-zinc-400' };
+    if (status === 'success') return { text: 'Trimmed', disabled: true, className: 'bg-green-600' };
+    if (status === 'error') return { text: 'Retry', disabled: false, className: 'bg-red-600 hover:bg-red-700' };
+    return { text: 'Trim 1/3', disabled: false, className: 'bg-amber-600 hover:bg-amber-700' };
+  };
+
+  const handleExecuteTrim = async (rec: TrimRecommendation) => {
+    // Prevent double execution
+    if (trimExecutingRef.current.has(rec.ticker) || executedTrims[rec.ticker]) return;
+
+    trimExecutingRef.current.add(rec.ticker);
+    setExecutedTrims(prev => ({ ...prev, [rec.ticker]: 'executing' }));
+    setErrorMessage(null);
+
+    try {
+      if (onTrim) {
+        await onTrim(rec);
+        setExecutedTrims(prev => ({ ...prev, [rec.ticker]: 'success' }));
+      }
+    } catch (error) {
+      setExecutedTrims(prev => ({ ...prev, [rec.ticker]: 'error' }));
+      setErrorMessage(`Error trimming ${rec.ticker}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   return (
@@ -1884,6 +1925,80 @@ function ViewSuggestedTrades({ state, onTickerClick }: { state: AgentState; onTi
         </Card>
       )}
 
+      {/* Trim Recommendations */}
+      {trimRecommendations.length > 0 && (
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Trim Recommendations (2R Targets)
+              <Pill tone="good">{trimRecommendations.length}</Pill>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ticker</TableHead>
+                  <TableHead className="text-right">Current R</TableHead>
+                  <TableHead className="text-right">Entry</TableHead>
+                  <TableHead className="text-right">Current</TableHead>
+                  <TableHead className="text-right">2R Target</TableHead>
+                  <TableHead className="text-right">Shares</TableHead>
+                  <TableHead className="text-right">Est. P&L</TableHead>
+                  <TableHead className="text-center">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {trimRecommendations.map((rec) => {
+                  const btnState = getTrimButtonState(rec.ticker);
+                  return (
+                    <TableRow key={rec.ticker}>
+                      <TableCell className="font-mono">
+                        {onTickerClick ? (
+                          <ClickableTicker ticker={rec.ticker} onClick={onTickerClick} />
+                        ) : (
+                          <span className="font-semibold">{rec.ticker}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Pill tone="good">+{rec.current_r.toFixed(2)}R</Pill>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${rec.entry_price.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${rec.current_price.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-green-600">
+                        ${rec.trim_price.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {rec.shares_to_sell} / {rec.current_shares}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Pill tone="good">+${rec.potential_pnl.toFixed(0)}</Pill>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <button
+                          onClick={() => handleExecuteTrim(rec)}
+                          disabled={btnState.disabled}
+                          className={`px-3 py-1 text-xs font-medium text-white rounded transition-colors ${btnState.className} disabled:cursor-not-allowed`}
+                        >
+                          {btnState.text}
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <div className="mt-3 text-xs text-zinc-500">
+              Trim 1/3 at 2R profit target to lock in gains. Remaining position becomes runner.
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Withheld Trades */}
       <Card className="rounded-2xl shadow-sm">
         <CardHeader className="pb-3">
@@ -2044,9 +2159,32 @@ function ViewTradesToday({ state, onTickerClick }: { state: AgentState; onTicker
   );
 }
 
-function ViewPortfolio({ state, onTickerClick }: { state: AgentState; onTickerClick?: (ticker: string) => void }) {
+function ViewPortfolio({
+  state,
+  onTickerClick,
+  onTrimPosition,
+  onSellPosition,
+}: {
+  state: AgentState;
+  onTickerClick?: (ticker: string) => void;
+  onTrimPosition?: (position: PortfolioPosition) => Promise<void>;
+  onSellPosition?: (position: PortfolioPosition) => void;
+}) {
   const portfolio = state.portfolio;
   const { summary, positions } = portfolio;
+
+  // Track executing trim actions
+  const [executingTrims, setExecutingTrims] = useState<Record<string, boolean>>({});
+
+  const handleTrim = async (position: PortfolioPosition) => {
+    if (executingTrims[position.ticker] || !onTrimPosition) return;
+    setExecutingTrims(prev => ({ ...prev, [position.ticker]: true }));
+    try {
+      await onTrimPosition(position);
+    } finally {
+      setExecutingTrims(prev => ({ ...prev, [position.ticker]: false }));
+    }
+  };
 
   const totals = useMemo(() => {
     const invested = positions.reduce((acc, p) => acc + (p.value ?? 0), 0);
@@ -2107,13 +2245,14 @@ function ViewPortfolio({ state, onTickerClick }: { state: AgentState; onTickerCl
                 <TableHead className="text-right">Weight</TableHead>
                 <TableHead className="text-right">Value</TableHead>
                 <TableHead className="text-right">E(d)</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {positions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={15} className="text-center text-zinc-500 py-8">
+                  <TableCell colSpan={16} className="text-center text-zinc-500 py-8">
                     No open positions
                   </TableCell>
                 </TableRow>
@@ -2180,6 +2319,29 @@ function ViewPortfolio({ state, onTickerClick }: { state: AgentState; onTickerCl
                           {p.earnings_days ?? '—'}
                         </Pill>
                       </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canTrim && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleTrim(p)}
+                              disabled={executingTrims[p.ticker]}
+                              className="h-7 px-2 text-xs"
+                            >
+                              {executingTrims[p.ticker] ? '...' : 'Trim'}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => onSellPosition?.(p)}
+                            className="h-7 px-2 text-xs"
+                          >
+                            Sell
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 }))}
@@ -2210,6 +2372,10 @@ export default function TradingAgentDashboard() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [isChartModalOpen, setIsChartModalOpen] = useState(false);
 
+  // Sell modal state
+  const [sellPosition, setSellPosition] = useState<PortfolioPosition | null>(null);
+  const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+
   const handleTickerClick = (ticker: string) => {
     setSelectedTicker(ticker);
     setIsChartModalOpen(true);
@@ -2218,6 +2384,83 @@ export default function TradingAgentDashboard() {
   const handleCloseChartModal = () => {
     setIsChartModalOpen(false);
     setSelectedTicker(null);
+  };
+
+  const handleOpenSellModal = (position: PortfolioPosition) => {
+    setSellPosition(position);
+    setIsSellModalOpen(true);
+  };
+
+  const handleCloseSellModal = () => {
+    setIsSellModalOpen(false);
+    setSellPosition(null);
+  };
+
+  // Trim handler - trims 1/3 of position at current price
+  const handleTrimPosition = async (position: PortfolioPosition) => {
+    const sharesToSell = Math.floor((position.shares ?? 0) / 3);
+    const currentPrice = position.last_price ?? position.entry;
+
+    const trade: TradeInput = {
+      ticker: position.ticker,
+      side: 'SELL',
+      action_type: 'TRIM',
+      shares: sharesToSell,
+      price: currentPrice,
+      r_multiple: position.total_r,
+      mode: position.mode,
+      notes: `Trim 1/3 at ${(position.total_r ?? 0).toFixed(2)}R. Entry: $${position.entry.toFixed(2)}, SSL: $${position.ssl.toFixed(2)}`,
+    };
+
+    const result = await saveTradeToDatabase(trade);
+    if (!result) {
+      throw new Error('Failed to save trim trade');
+    }
+  };
+
+  // Trim handler for TrimRecommendation (from Suggested Trades view)
+  const handleTrimRecommendation = async (rec: TrimRecommendation) => {
+    const trade: TradeInput = {
+      ticker: rec.ticker,
+      side: 'SELL',
+      action_type: 'TRIM',
+      shares: rec.shares_to_sell,
+      price: rec.current_price,
+      r_multiple: rec.current_r,
+      mode: rec.position.mode,
+      notes: `Trim 1/3 at ${rec.current_r.toFixed(2)}R. Entry: $${rec.entry_price.toFixed(2)}, SSL: $${rec.ssl.toFixed(2)}`,
+    };
+
+    const result = await saveTradeToDatabase(trade);
+    if (!result) {
+      throw new Error('Failed to save trim trade');
+    }
+  };
+
+  // Sell handler - sells specified number of shares
+  const handleSellShares = async (shares: number) => {
+    if (!sellPosition) return;
+
+    const currentPrice = sellPosition.last_price ?? sellPosition.entry;
+    const isFullExit = shares >= (sellPosition.shares ?? 0);
+
+    const trade: TradeInput = {
+      ticker: sellPosition.ticker,
+      side: 'SELL',
+      action_type: isFullExit ? 'EXIT' : 'TRIM',
+      shares: shares,
+      price: currentPrice,
+      r_multiple: sellPosition.total_r,
+      mode: sellPosition.mode,
+      notes: isFullExit
+        ? `Full exit at ${(sellPosition.total_r ?? 0).toFixed(2)}R`
+        : `Partial sell (${shares} shares) at ${(sellPosition.total_r ?? 0).toFixed(2)}R`,
+    };
+
+    const result = await saveTradeToDatabase(trade);
+    if (!result) {
+      throw new Error('Failed to save sell trade');
+    }
   };
 
   // Run pipeline on mount
@@ -2320,9 +2563,9 @@ export default function TradingAgentDashboard() {
           {active === "Liquid Leaders" && <ViewLiquidLeaders state={agentState} onTickerClick={handleTickerClick} />}
           {active === "Pullback Scan" && <ViewPullbackScan state={agentState} onTickerClick={handleTickerClick} />}
           {active === "Focus List" && <ViewFocusList state={agentState} onTickerClick={handleTickerClick} />}
-          {active === "Suggested Trades" && <ViewSuggestedTrades state={agentState} onTickerClick={handleTickerClick} />}
+          {active === "Suggested Trades" && <ViewSuggestedTrades state={agentState} onTickerClick={handleTickerClick} onTrim={handleTrimRecommendation} />}
           {active === "Trades Today" && <ViewTradesToday state={agentState} onTickerClick={handleTickerClick} />}
-          {active === "Portfolio" && <ViewPortfolio state={agentState} onTickerClick={handleTickerClick} />}
+          {active === "Portfolio" && <ViewPortfolio state={agentState} onTickerClick={handleTickerClick} onTrimPosition={handleTrimPosition} onSellPosition={handleOpenSellModal} />}
         </>
       ) : (
         <div className="flex min-h-[400px] items-center justify-center">
@@ -2338,6 +2581,14 @@ export default function TradingAgentDashboard() {
           onClose={handleCloseChartModal}
         />
       )}
+
+      {/* Sell Modal */}
+      <SellModal
+        position={sellPosition}
+        isOpen={isSellModalOpen}
+        onClose={handleCloseSellModal}
+        onConfirm={handleSellShares}
+      />
     </div>
   );
 }

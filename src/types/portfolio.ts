@@ -86,6 +86,36 @@ export interface PortfolioPosition {
 }
 
 /**
+ * Trim recommendation for positions at 2R profit target
+ */
+export interface TrimRecommendation {
+  /** Stock ticker symbol */
+  ticker: string;
+  /** Action type is always TRIM */
+  action_type: 'TRIM';
+  /** Number of shares to sell (1/3 of position) */
+  shares_to_sell: number;
+  /** Total shares currently held */
+  current_shares: number;
+  /** Original entry price */
+  entry_price: number;
+  /** Current market price */
+  current_price: number;
+  /** 2R target price */
+  trim_price: number;
+  /** Structural stop loss */
+  ssl: number;
+  /** Current R multiple */
+  current_r: number;
+  /** Estimated P&L from trim in dollars */
+  potential_pnl: number;
+  /** Estimated P&L as percentage of equity */
+  potential_pnl_pct: number;
+  /** Full position context */
+  position: PortfolioPosition;
+}
+
+/**
  * Task 8 output payload
  * Contains portfolio summary and all positions.
  */
@@ -95,6 +125,8 @@ export interface PortfolioOutput {
   summary: PortfolioSummary;
   /** All open positions */
   positions: PortfolioPosition[];
+  /** Trim recommendations for positions at 2R */
+  trim_recommendations: TrimRecommendation[];
   /** Timestamp of last update */
   as_of?: string;
 }
