@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { PortfolioPosition, TrimRecommendation } from "@/types";
 
 // Pipeline imports
-import { runAgentPipeline, AgentState, saveTradeToDatabase, TradeInput, PipelineProgress, clearPipelineCache } from "@/lib/agent-pipeline";
+import { runAgentPipeline, AgentState, saveTradeToDatabase, TradeInput, PipelineProgress, clearPipelineCache, refreshPortfolioOnly } from "@/lib/agent-pipeline";
 import { calculateTradeStats } from "@/tasks/overview";
 
 // =============================================================================
@@ -2231,8 +2231,6 @@ function ViewPortfolio({
             <TableHeader>
               <TableRow>
                 <TableHead>Ticker</TableHead>
-                <TableHead>Mode</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead className="text-right">R</TableHead>
                 <TableHead className="text-right">Heat</TableHead>
                 <TableHead className="text-right">Shares</TableHead>
@@ -2252,7 +2250,7 @@ function ViewPortfolio({
             <TableBody>
               {positions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={16} className="text-center text-zinc-500 py-8">
+                  <TableCell colSpan={14} className="text-center text-zinc-500 py-8">
                     No open positions
                   </TableCell>
                 </TableRow>
@@ -2272,16 +2270,6 @@ function ViewPortfolio({
                         ) : (
                           <span className="font-semibold text-zinc-900">{p.ticker}</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Pill tone={p.mode === 'MODE2' ? 'good' : 'neutral'}>
-                          {p.mode ?? 'M1'}
-                        </Pill>
-                      </TableCell>
-                      <TableCell>
-                        <Pill tone={p.status === 'RUNNER' ? 'good' : p.status === 'CORE' ? 'neutral' : 'neutral'}>
-                          {p.status ?? 'STARTER'}
-                        </Pill>
                       </TableCell>
                       <TableCell className="text-right">
                         <Pill tone={rMultiple >= 2 ? "good" : rMultiple < 0 ? "warn" : "neutral"}>
@@ -2396,6 +2384,24 @@ export default function TradingAgentDashboard() {
     setSellPosition(null);
   };
 
+  // Helper to refresh portfolio after trade execution
+  const refreshPortfolio = async () => {
+    try {
+      const updatedPortfolio = await refreshPortfolioOnly(
+        agentState?.portfolio?.summary?.equity ?? 100000,
+        agentState?.portfolio?.summary?.cash ?? 50000
+      );
+      if (agentState) {
+        setAgentState({
+          ...agentState,
+          portfolio: updatedPortfolio,
+        });
+      }
+    } catch (err) {
+      console.error('[Dashboard] Failed to refresh portfolio:', err);
+    }
+  };
+
   // Trim handler - trims 1/3 of position at current price
   const handleTrimPosition = async (position: PortfolioPosition) => {
     const sharesToSell = Math.floor((position.shares ?? 0) / 3);
@@ -2416,6 +2422,9 @@ export default function TradingAgentDashboard() {
     if (!result) {
       throw new Error('Failed to save trim trade');
     }
+
+    // Refresh portfolio after successful trim
+    await refreshPortfolio();
   };
 
   // Trim handler for TrimRecommendation (from Suggested Trades view)
@@ -2435,6 +2444,9 @@ export default function TradingAgentDashboard() {
     if (!result) {
       throw new Error('Failed to save trim trade');
     }
+
+    // Refresh portfolio after successful trim
+    await refreshPortfolio();
   };
 
   // Sell handler - sells specified number of shares
@@ -2461,6 +2473,9 @@ export default function TradingAgentDashboard() {
     if (!result) {
       throw new Error('Failed to save sell trade');
     }
+
+    // Refresh portfolio after successful sell
+    await refreshPortfolio();
   };
 
   // Run pipeline on mount
