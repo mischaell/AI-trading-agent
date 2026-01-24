@@ -1572,8 +1572,8 @@ function ViewFocusList({ state, onTickerClick }: { state: AgentState; onTickerCl
   const focusList = state.focusList;
   const marketState = state.marketState;
 
-  // Limit to top 5
-  const candidates = (focusList.candidates ?? []).slice(0, 5);
+  // Show all candidates (up to 10 from focus list ranking)
+  const candidates = focusList.candidates ?? [];
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4">
