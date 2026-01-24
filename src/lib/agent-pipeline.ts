@@ -1147,8 +1147,9 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
 
     // ─────────────────────────────────────────────────────────────────────────
     // Task 2: Universe Scan (cached 1 hour)
+    // Now fetches REAL data before filtering
     // ─────────────────────────────────────────────────────────────────────────
-    await notify('Task 2', 'starting', 10, 'Scanning liquid leaders...');
+    await notify('Task 2', 'starting', 10, 'Fetching RS data...');
 
     let rsData: Map<string, RSData>;
     if (isCacheValid(pipelineCache.rsData)) {
@@ -1160,41 +1161,99 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       console.log('[Pipeline] Task 2: Fetched fresh RS data');
     }
 
-    // Filter to liquid leaders (RS >= 70, not China ADR, not defensive)
-    const isDefensive = (theme: string) =>
-      DEFENSIVE_THEMES.some(d => theme.toLowerCase().includes(d.toLowerCase()));
+    // Fetch REAL universe data for ALL tickers BEFORE filtering
+    await notify('Task 2', 'running', 12, 'Fetching universe data (price, volume, liquidity)...');
 
-    const liquidLeaderTickers: string[] = [];
-    const rsDataArray = Array.from(rsData.entries());
-    for (const [ticker, rs] of rsDataArray) {
-      if (rs.rs >= 70 && !CHINA_ADRS.has(ticker)) {
-        const theme = TICKER_THEMES[ticker] || 'Unknown';
-        if (!isDefensive(theme)) {
-          liquidLeaderTickers.push(ticker);
+    let universeItemData: Map<string, UniverseDataItem>;
+    if (isCacheValid(pipelineCache.universeData)) {
+      universeItemData = pipelineCache.universeData!.data;
+      console.log('[Pipeline] Task 2: Using cached universe data');
+    } else {
+      universeItemData = new Map();
+
+      // Fetch universe data in batches using the batch API
+      const BATCH_SIZE = 20; // API max batch size
+      for (let i = 0; i < NASDAQ_100_TICKERS.length; i += BATCH_SIZE) {
+        const batch = NASDAQ_100_TICKERS.slice(i, i + BATCH_SIZE);
+        try {
+          const response = await fetch(`${BASE_URL}/api/universe-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tickers: batch }),
+          });
+          const result = await response.json() as { success: boolean; data?: UniverseDataItem[] };
+          if (result.success && Array.isArray(result.data)) {
+            for (const item of result.data) {
+              universeItemData.set(item.ticker, item);
+            }
+          }
+        } catch (error) {
+          console.error(`[Pipeline] Failed to fetch universe batch:`, error);
         }
+
+        // Rate limiting between batches
+        if (i + BATCH_SIZE < NASDAQ_100_TICKERS.length) {
+          await delay(300);
+        }
+
+        // Progress update
+        const progress = 12 + Math.round((i / NASDAQ_100_TICKERS.length) * 8);
+        await notify('Task 2', 'running', progress, `Fetched ${Math.min(i + BATCH_SIZE, NASDAQ_100_TICKERS.length)}/${NASDAQ_100_TICKERS.length} tickers`);
       }
+
+      pipelineCache.universeData = { data: universeItemData, timestamp: Date.now() };
+      console.log(`[Pipeline] Task 2: Fetched universe data for ${universeItemData.size} tickers`);
     }
 
-    // Build TickerData for universe scan
-    // Note: Using placeholder values here - actual data is fetched in Task 3
-    // TODO: Restructure pipeline to fetch universe data before universe scan for proper filtering
-    const tickerDataForScan: TickerData[] = liquidLeaderTickers.map(ticker => {
+    await notify('Task 2', 'running', 20, 'Filtering liquid leaders...');
+
+    // Helper to check if sector is excluded
+    const isExcludedSector = (theme: string) => {
+      const themeLower = theme.toLowerCase();
+      const EXCLUDED_SECTORS = [
+        'biotech', 'biotechnology', 'pharmaceuticals', 'pharma',
+        'materials', 'basic materials', 'chemicals', 'metals', 'mining',
+        'consumer staples', 'food', 'beverage', 'tobacco', 'household',
+        'energy', 'oil', 'gas', 'petroleum',
+        'utilities', 'electric utilities', 'gas utilities',
+        'real estate', 'reits',
+        'healthcare', 'health care', 'medical', 'diagnostics',
+        'industrials', 'industrial', 'aerospace', 'defense', 'machinery', 'construction',
+      ];
+      return EXCLUDED_SECTORS.some(s => themeLower.includes(s));
+    };
+
+    // Build TickerData with REAL data for universe scan
+    const tickerDataForScan: TickerData[] = [];
+    for (const ticker of NASDAQ_100_TICKERS) {
       const rs = rsData.get(ticker);
-      return {
+      const univData = universeItemData.get(ticker);
+
+      // Skip if no data available
+      if (!rs || !univData) {
+        console.log(`[Pipeline] Skipping ${ticker}: missing RS or universe data`);
+        continue;
+      }
+
+      const theme = TICKER_THEMES[ticker] || 'Unknown';
+
+      tickerDataForScan.push({
         ticker,
-        rs: rs?.rs ?? 70,
-        adr_pct: 3.0,
-        liquidity_m: 500,
-        volume_m: 2.0,       // Placeholder - actual data fetched in Task 3
-        price: 100,
-        market_cap_b: 10,    // Placeholder - actual data fetched in Task 3
-        dist_21ema_atr: 0,
-        earnings_days: 30,
-        theme: TICKER_THEMES[ticker] || 'Unknown',
+        rs: rs.rs,
+        adr_pct: univData.adrPct,
+        liquidity_m: univData.liquidityM,
+        volume_m: univData.volumeM,
+        price: univData.price,
+        market_cap_b: univData.marketCapB,
+        dist_21ema_atr: 0, // Will be calculated in Task 3
+        earnings_days: 30, // Will be updated in Task 4
+        theme,
         is_china_adr: CHINA_ADRS.has(ticker),
-        is_excluded_sector: isDefensive(TICKER_THEMES[ticker] || ''),
-      };
-    });
+        is_excluded_sector: isExcludedSector(theme),
+      });
+    }
+
+    console.log(`[Pipeline] Task 2: Built TickerData for ${tickerDataForScan.length} tickers with real data`);
 
     const universe = scanLiquidLeaders(tickerDataForScan);
     await notify('Task 2', 'complete', 25, `Found ${universe.count} liquid leaders`);
@@ -1204,19 +1263,17 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
 
     // ─────────────────────────────────────────────────────────────────────────
     // Task 3: Pullback Scan (cached 1 hour)
+    // Universe data already fetched in Task 2, just need structure/OHLC data
     // ─────────────────────────────────────────────────────────────────────────
     await notify('Task 3', 'starting', 25, 'Analyzing pullback structures...');
 
     let structureData: Map<string, StructureAnalysis>;
-    let universeItemData: Map<string, UniverseDataItem>;
 
-    if (isCacheValid(pipelineCache.structureData) && isCacheValid(pipelineCache.universeData)) {
+    if (isCacheValid(pipelineCache.structureData)) {
       structureData = pipelineCache.structureData!.data;
-      universeItemData = pipelineCache.universeData!.data;
       console.log('[Pipeline] Task 3: Using cached structure data');
     } else {
       structureData = new Map();
-      universeItemData = new Map();
 
       const BATCH_SIZE = 5;
       const leaders = universe.leaders ?? [];
@@ -1224,18 +1281,15 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       for (let i = 0; i < leaders.length; i += BATCH_SIZE) {
         const batch = leaders.slice(i, i + BATCH_SIZE);
         const batchPromises = batch.map(async (leader) => {
-          const [ohlc, univData] = await Promise.all([
-            fetchOHLCData(leader.ticker, 60),
-            fetchUniverseData(leader.ticker),
-          ]);
+          // Only fetch OHLC - universe data already fetched in Task 2
+          const ohlc = await fetchOHLCData(leader.ticker, 60);
           const structure = analyzeTickerStructure(leader.ticker, ohlc);
-          return { ticker: leader.ticker, structure, univData };
+          return { ticker: leader.ticker, structure };
         });
 
         const batchResults = await Promise.all(batchPromises);
-        for (const { ticker, structure, univData } of batchResults) {
+        for (const { ticker, structure } of batchResults) {
           if (structure) structureData.set(ticker, structure);
-          if (univData) universeItemData.set(ticker, univData);
         }
 
         // Rate limiting
@@ -1249,7 +1303,6 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       }
 
       pipelineCache.structureData = { data: structureData, timestamp: Date.now() };
-      pipelineCache.universeData = { data: universeItemData, timestamp: Date.now() };
     }
 
     // Build pullback candidates from real structure data
