@@ -18,6 +18,7 @@ import {
   McsiSlope,
   McsiVs10dma,
   NewEntriesPermission,
+  BreadthDirection,
 } from '@/types';
 
 // =============================================================================
@@ -47,6 +48,16 @@ export interface BreadthData {
   mcsi_10dma: Decimal | number | string;
   /** Previous day's MCSI z-score (for slope detection) */
   mcsi_z_prev: Decimal | number | string;
+
+  // === Optional: Raw values for direction calculation ===
+  /** Raw MCO value (not z-score) */
+  mco_value?: number;
+  /** Previous day's raw MCO value */
+  mco_value_prev?: number;
+  /** Raw MCSI value (not z-score) */
+  mcsi_value?: number;
+  /** Previous day's raw MCSI value */
+  mcsi_value_prev?: number;
 }
 
 /**
@@ -233,7 +244,9 @@ function determineMcsiSlope(
   mcsiZ: Decimal,
   mcsiZPrev: Decimal
 ): McsiSlope {
-  return mcsiZ.gt(mcsiZPrev) ? 'curling_up' : 'curling_down';
+  // If equal (e.g., no previous data available), default to 'curling_up'
+  // to avoid falsely triggering PARTICIPATION_FADE
+  return mcsiZ.gte(mcsiZPrev) ? 'curling_up' : 'curling_down';
 }
 
 /**
@@ -248,6 +261,50 @@ function determineMcsiVs10dma(
   mcsi10dma: Decimal
 ): McsiVs10dma {
   return mcsiZ.gte(mcsi10dma) ? 'above' : 'below';
+}
+
+// =============================================================================
+// Breadth Direction (NEW)
+// =============================================================================
+
+/**
+ * Calculate breadth direction based on day-over-day MCO change
+ *
+ * @param mcoChange - Day-over-day change in MCO value
+ * @returns BreadthDirection
+ */
+function calculateBreadthDirection(mcoChange: number): BreadthDirection {
+  if (mcoChange > 3) return 'HOOK_UP';      // Very bullish reversal
+  if (mcoChange > 1) return 'EXPANDING';    // Bullish momentum
+  if (mcoChange < -3) return 'HOOK_DOWN';   // Very bearish reversal
+  if (mcoChange < -1) return 'CONTRACTING'; // Bearish momentum
+  return 'FLAT';                             // Neutral
+}
+
+/**
+ * Get breadth multiplier for position sizing
+ *
+ * Based on breadth direction and z-score extremes
+ *
+ * @param direction - Current breadth direction
+ * @param mcoZ - MCO z-score (for overbought/oversold detection)
+ * @returns Multiplier between 0.7 and 1.2
+ */
+function getBreadthMultiplier(direction: BreadthDirection, mcoZ: number): number {
+  const isOverbought = mcoZ >= 1;
+  const isOversold = mcoZ <= -1;
+
+  // Direction takes priority, z-score modifies
+  if (direction === 'HOOK_UP' && !isOverbought) return 1.2;  // Strong bullish, not extended
+  if (direction === 'HOOK_DOWN') return 0.7;                  // Strong bearish
+  if (direction === 'EXPANDING') return 1.1;                  // Bullish
+  if (direction === 'CONTRACTING') return 0.85;               // Bearish
+
+  // Flat direction - check extremes
+  if (isOverbought) return 0.8;    // Extended, reduce size
+  if (isOversold) return 0.75;     // Oversold, cautious
+
+  return 1.0;  // Neutral
 }
 
 // =============================================================================
@@ -280,53 +337,73 @@ function determineMarketState(
   mcsiSlope: McsiSlope,
   mcsiVs10dma: McsiVs10dma
 ): MarketStateLabel {
-  // WASHOUT: Extreme oversold (MCO < -2σ)
-  if (mcoZ.lt(-2)) {
-    return 'WASHOUT';
-  }
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRIORITY 1: QQQE Structure determines if we can trade
+  // PRIORITY 2: Breadth (MCO/MCSI) determines how aggressive
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  // EARLY_CONFIRMATION: MCO recently at washout levels, MCSI curling up
-  // Market near or reclaiming structure
-  if (mcoZ.lte(-1) && mcsiSlope === 'curling_up' &&
-      (position === 'inside_cloud' || position === 'below_cloud')) {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // QQQE ABOVE STRUCTURE: Always tradeable - breadth determines aggression level
+  // Per Alex: QQQE structure = can we trade, breadth = how aggressive
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (position === 'above_cloud') {
+    // Above structure + rising slope = CONFIRMED_UPTREND (PRESSING - full aggression)
+    if (slope === 'rising') {
+      return 'CONFIRMED_UPTREND';
+    }
+    // Above structure + flat/falling slope but good breadth = CONFIRMED_UPTREND
+    if (mcsiSlope === 'curling_up' || mcoZ.gt(0)) {
+      return 'CONFIRMED_UPTREND';
+    }
+    // Above structure but breadth not confirming = EARLY_CONFIRMATION (TESTING - reduced size)
+    // Still tradeable, just not pressing
     return 'EARLY_CONFIRMATION';
   }
 
-  // Also EARLY_CONFIRMATION: Just emerged from washout, structure improving
-  if (mcoZ.gt(-1) && mcoZ.lt(0) && mcsiSlope === 'curling_up' &&
-      position === 'inside_cloud' && slope === 'rising') {
-    return 'EARLY_CONFIRMATION';
+  // ─────────────────────────────────────────────────────────────────────────────
+  // QQQE INSIDE STRUCTURE: Cautious - breadth determines if tradeable
+  // Per Alex: Inside cloud = uncertain, need breadth confirmation
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (position === 'inside_cloud') {
+    // Inside cloud + rising slope = EARLY_CONFIRMATION (testing allowed)
+    if (slope === 'rising') {
+      return 'EARLY_CONFIRMATION';
+    }
+    // Inside cloud + flat slope + breadth not deteriorating = EARLY_CONFIRMATION
+    if (slope === 'flat' && mcsiSlope === 'curling_up') {
+      return 'EARLY_CONFIRMATION';
+    }
+    // Inside cloud + flat slope + neutral/positive MCO = EARLY_CONFIRMATION
+    if (slope === 'flat' && mcoZ.gte(0)) {
+      return 'EARLY_CONFIRMATION';
+    }
+    // Inside cloud with falling slope or deteriorating breadth = PARTICIPATION_FADE (DEFENSIVE)
+    return 'PARTICIPATION_FADE';
   }
 
-  // CONFIRMED_UPTREND: Above structure, breadth confirming
-  if (position === 'above_cloud' && slope === 'rising' &&
-      mcsiZ.gt(0) && mcsiVs10dma === 'above') {
-    return 'CONFIRMED_UPTREND';
-  }
-
-  // Also CONFIRMED_UPTREND: Strong breadth even if structure is flat
-  if (position === 'above_cloud' &&
-      mcsiZ.gt(1) && mcoZ.gt(0) && mcsiSlope === 'curling_up') {
-    return 'CONFIRMED_UPTREND';
-  }
-
-  // BREAKDOWN: Below structure with weak breadth
-  if (position === 'below_cloud' && slope === 'falling' && mcsiZ.lt(0)) {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // QQQE BELOW STRUCTURE: Generally no new trades, but watch for reclaim attempts
+  // Per Alex: Below cloud but close to structure + higher low = EARLY_CONFIRMATION (testing)
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (position === 'below_cloud') {
+    // Extreme oversold (MCO < -2σ) = WASHOUT (potential bottom)
+    if (mcoZ.lt(-2)) {
+      return 'WASHOUT';
+    }
+    // Below structure but slope rising = higher low forming, attempting reclaim
+    // This is the "close to structure + higher low" scenario = EARLY_CONFIRMATION (testing pilots)
+    if (slope === 'rising') {
+      return 'EARLY_CONFIRMATION';
+    }
+    // Below structure but breadth improving = EARLY_CONFIRMATION (recovery starting)
+    if (mcsiSlope === 'curling_up' && mcoZ.gt(-1)) {
+      return 'EARLY_CONFIRMATION';
+    }
+    // Below structure with weak breadth and no reclaim attempt = BREAKDOWN
     return 'BREAKDOWN';
   }
 
-  // PARTICIPATION_FADE: Breadth deteriorating, defense mode
-  // This is the default "caution" state when not in other states
-  if (mcsiSlope === 'curling_down' || mcsiVs10dma === 'below') {
-    return 'PARTICIPATION_FADE';
-  }
-
-  // Inside cloud with mixed signals → PARTICIPATION_FADE
-  if (position === 'inside_cloud') {
-    return 'PARTICIPATION_FADE';
-  }
-
-  // Default fallback
+  // Default fallback (shouldn't reach here)
   return 'PARTICIPATION_FADE';
 }
 
@@ -334,7 +411,7 @@ function determineMarketState(
  * Get permissions for a given market state
  *
  * Permissions from agent_skeleton_v1.0.md Section 1:
- * - EARLY_CONFIRMATION: Limited entries, no adds/pressing, trims OK
+ * - EARLY_CONFIRMATION: Entries allowed, adds OK, no pressing, trims OK
  * - CONFIRMED_UPTREND: Full permissions
  * - PARTICIPATION_FADE: No new entries/adds/pressing, trims OK
  * - BREAKDOWN: No entries, trims only
@@ -355,7 +432,7 @@ function getPermissionsForState(state: MarketStateLabel): MarketPermissions {
 
     case 'EARLY_CONFIRMATION':
       return {
-        new_entries: 'LIMITED',
+        new_entries: 'YES',
         adds: true,
         pressing: false,
         trims: true,
@@ -462,6 +539,27 @@ export function analyzeMarketState(
   // Get permissions for state
   const permissions = getPermissionsForState(state);
 
+  // Calculate breadth direction if raw values are provided
+  const mcoValue = breadth.mco_value ?? undefined;
+  const mcoValuePrev = breadth.mco_value_prev ?? undefined;
+  const mcsiValue = breadth.mcsi_value ?? undefined;
+  const mcsiValuePrev = breadth.mcsi_value_prev ?? undefined;
+
+  let mcoChange: number | undefined;
+  let mcsiChange: number | undefined;
+  let breadthDirection: BreadthDirection | undefined;
+  let breadthMultiplier: number | undefined;
+
+  if (mcoValue !== undefined && mcoValuePrev !== undefined) {
+    mcoChange = mcoValue - mcoValuePrev;
+    breadthDirection = calculateBreadthDirection(mcoChange);
+    breadthMultiplier = getBreadthMultiplier(breadthDirection, mcoZ.toNumber());
+  }
+
+  if (mcsiValue !== undefined && mcsiValuePrev !== undefined) {
+    mcsiChange = mcsiValue - mcsiValuePrev;
+  }
+
   return {
     task: 'market_state',
     market: 'QQQE',
@@ -474,6 +572,13 @@ export function analyzeMarketState(
     mcsi_vs_10dma: mcsiVs10dma,
     state,
     permissions,
+    // NEW: Breadth direction fields
+    mco_value: mcoValue,
+    mco_change: mcoChange,
+    mcsi_value: mcsiValue,
+    mcsi_change: mcsiChange,
+    breadth_direction: breadthDirection,
+    breadth_multiplier: breadthMultiplier,
   };
 }
 
@@ -572,6 +677,9 @@ export {
   toDecimal,
   convertToOHLCBar,
   convertToBreadthData,
+  // NEW: Breadth direction
+  calculateBreadthDirection,
+  getBreadthMultiplier,
 };
 
 export type { EMAStructure, EMAStructureWithSlope };

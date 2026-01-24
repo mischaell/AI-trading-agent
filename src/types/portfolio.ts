@@ -77,6 +77,12 @@ export interface PortfolioPosition {
   trim_2r_price?: number;
   /** Sector/theme */
   theme?: string;
+  /** Entry mode (MODE1 or MODE2) */
+  mode?: 'MODE1' | 'MODE2';
+  /** Distance from current price to SSL in % */
+  ssl_distance_pct?: number;
+  /** Whether 2R trim is available */
+  trim_available?: boolean;
 }
 
 /**

@@ -59,6 +59,12 @@ export interface RawPosition {
   dist_21_atr?: number;
   /** Sector/theme */
   theme?: string;
+  /** Entry mode (MODE1 or MODE2) */
+  mode?: 'MODE1' | 'MODE2';
+  /** Position status from database */
+  status?: PositionStatus;
+  /** Percentage already trimmed */
+  trimmed_pct?: number;
 }
 
 /**
@@ -335,9 +341,9 @@ export function calculatePositionMetrics(
   const openHeat = calculateOpenHeat(shares, lastPrice, avgPrice, equity);
   const ecRisk = calculateEcRisk(shares, avgPrice, ssl, equity);
 
-  // Calculate trimmed percentage
+  // Calculate trimmed percentage (prefer from database, fallback to trades)
   const originalShares = position.original_shares ?? position.shares;
-  const trimmedPct = calculateTrimmedPercent(
+  const trimmedPct = position.trimmed_pct ?? calculateTrimmedPercent(
     position.ticker,
     originalShares,
     position.shares,
@@ -352,11 +358,19 @@ export function calculatePositionMetrics(
     equity
   );
 
-  // Determine status
-  const status = determinePositionStatus(rMultiple, config);
+  // Determine status (prefer from database if available)
+  const status = position.status ?? determinePositionStatus(rMultiple, config);
 
   // Position value
   const positionValue = shares.times(lastPrice);
+
+  // Calculate SSL distance percentage: (lastPrice - ssl) / lastPrice * 100
+  const sslDistancePct = lastPrice.gt(0)
+    ? lastPrice.minus(ssl).div(lastPrice).times(100).toNumber()
+    : 0;
+
+  // Trim is available if R >= 2 and less than 33% already trimmed
+  const trimAvailable = rMultiple.gte(2) && trimmedPct < 33;
 
   return {
     ticker: position.ticker,
@@ -378,6 +392,9 @@ export function calculatePositionMetrics(
     dist_21_atr: position.dist_21_atr,
     trim_2r_price: position.trim_2r_price,
     theme: position.theme,
+    mode: position.mode,
+    ssl_distance_pct: sslDistancePct,
+    trim_available: trimAvailable,
   };
 }
 

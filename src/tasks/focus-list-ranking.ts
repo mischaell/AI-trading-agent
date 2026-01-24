@@ -48,6 +48,8 @@ export interface FocusListTickerData extends ReadinessRow {
   theme: string;
   /** Reclaim/backtest quality grade (for manual promotion) */
   reclaim_backtest_grade?: ReclaimBacktestGrade;
+  /** Current price */
+  price?: number;
 }
 
 /**
@@ -389,6 +391,12 @@ function toFocusListCandidate(
     earnings_days: data.earnings_days ?? 0,
     reclaim_backtest_grade: data.reclaim_backtest_grade ?? (data.ready_grade as ReclaimBacktestGrade),
     is_promoted: scored.is_promoted,
+    // Backtest-style scoring fields
+    score: scored.total_score.toNumber(),
+    rs: data.rs,
+    price: data.price,
+    close_range_pct: data.close_range_pct,
+    is_contracting: data.contraction,
   };
 }
 
@@ -396,10 +404,14 @@ function toFocusListCandidate(
 // Main Export
 // =============================================================================
 
+/** Minimum earnings days to be considered tradeable */
+const MIN_EARNINGS_DAYS = 7;
+
 /**
  * Task 5 — Focus List Ranking (Top 5)
  *
  * Scores and ranks ready candidates, with optional manual promotion.
+ * Prioritizes tradeable candidates (earnings >= 7 days) over blocked ones.
  *
  * @param candidates - Array of READY candidates from Task 4
  * @param weights - Scoring weights (uses defaults if not specified)
@@ -424,10 +436,8 @@ export function rankFocusList(
   weights?: Partial<ScoringWeights>,
   manualPromotion?: ManualPromotionRequest
 ): FocusListOutput {
-  // Filter to only ready candidates
-  const readyCandidates = candidates.filter(c => c.ready);
-
-  if (readyCandidates.length === 0) {
+  // Use all candidates (no longer filtering by ready status)
+  if (candidates.length === 0) {
     return {
       task: 'focus_list',
       top5: [],
@@ -447,19 +457,44 @@ export function rankFocusList(
   };
 
   // Score all candidates
-  const scoredCandidates = readyCandidates.map(c => scoreCandidate(c, mergedWeights));
+  const scoredCandidates = candidates.map(c => scoreCandidate(c, mergedWeights));
 
-  // Sort by score
-  let rankedCandidates = sortByScore(scoredCandidates);
+  // Separate tradeable (earnings >= 7 days or unknown) from blocked
+  const isTradeable = (c: ScoredCandidate): boolean => {
+    const earningsDays = c.data.earnings_days ?? 999; // Unknown = tradeable
+    return earningsDays >= MIN_EARNINGS_DAYS || earningsDays < 0; // <0 means no earnings date
+  };
+
+  const tradeable = scoredCandidates.filter(isTradeable);
+  const blocked = scoredCandidates.filter(c => !isTradeable(c));
+
+  // Sort each group by score
+  const sortedTradeable = sortByScore(tradeable);
+  const sortedBlocked = sortByScore(blocked);
+
+  // Prioritize tradeable candidates, fill remaining slots with blocked
+  let rankedCandidates: ScoredCandidate[] = [];
+
+  // Take up to 5 tradeable candidates first
+  rankedCandidates = sortedTradeable.slice(0, 5);
+
+  // If we have fewer than 5 tradeable, fill with blocked candidates
+  if (rankedCandidates.length < 5) {
+    const remaining = 5 - rankedCandidates.length;
+    rankedCandidates = [...rankedCandidates, ...sortedBlocked.slice(0, remaining)];
+  }
+
+  // Keep rest for potential promotion
+  const allRanked = [...rankedCandidates, ...sortedTradeable.slice(5), ...sortedBlocked.slice(Math.max(0, 5 - sortedTradeable.length))];
 
   // Get initial top 5 tickers (before promotion)
   const initialTop5 = rankedCandidates.slice(0, 5).map(c => c.data.ticker);
 
   // Validate and apply manual promotion
-  const promotion = validateManualPromotion(manualPromotion, rankedCandidates, initialTop5);
+  const promotion = validateManualPromotion(manualPromotion, allRanked, initialTop5);
 
   if (promotion.used) {
-    rankedCandidates = applyPromotion(rankedCandidates, promotion);
+    rankedCandidates = applyPromotion(allRanked, promotion).slice(0, 5);
   }
 
   // Get final top 5

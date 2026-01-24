@@ -911,6 +911,239 @@ export class HistoricalDataLoader {
     const newsletter = this.getNewsletter(date);
     return newsletter?.pullback_candidates || [];
   }
+
+  // Breadth data cache
+  private breadthCache: Map<string, BreadthData> | null = null;
+
+  /**
+   * Calculate and cache Nasdaq 100 breadth indicators (MCO/MCSI)
+   * Must be called after preloadOHLC()
+   */
+  calculateBreadth(): Map<string, BreadthData> {
+    if (this.breadthCache) {
+      return this.breadthCache;
+    }
+
+    if (!this.ohlcPreloaded) {
+      console.warn("[HistoricalDataLoader] OHLC not preloaded, breadth calculation may be incomplete");
+    }
+
+    console.log("[HistoricalDataLoader] Calculating Nasdaq 100 breadth (MCO/MCSI)...");
+    this.breadthCache = calculateNasdaq100Breadth(this.ohlcCache, NASDAQ_100_TICKERS);
+    console.log("[HistoricalDataLoader] Breadth calculated for " + this.breadthCache.size + " days");
+
+    return this.breadthCache;
+  }
+
+  /**
+   * Get breadth data for a specific date
+   */
+  getBreadth(date: string): BreadthData | null {
+    if (!this.breadthCache) {
+      this.calculateBreadth();
+    }
+    return this.breadthCache?.get(date) || null;
+  }
+
+  /**
+   * Get breadth data for the most recent available date on or before the given date
+   */
+  getBreadthAsOf(date: string): BreadthData | null {
+    if (!this.breadthCache) {
+      this.calculateBreadth();
+    }
+
+    // Try exact date first
+    let breadth = this.breadthCache?.get(date);
+    if (breadth) return breadth;
+
+    // Find most recent date before the given date
+    const dates = Array.from(this.breadthCache?.keys() || []).sort();
+    for (let i = dates.length - 1; i >= 0; i--) {
+      if (dates[i] <= date) {
+        return this.breadthCache?.get(dates[i]) || null;
+      }
+    }
+
+    return null;
+  }
+}
+
+// =============================================================================
+// Nasdaq 100 Breadth Indicators (MCO / MCSI)
+// =============================================================================
+
+export interface BreadthData {
+  date: string;
+  advances: number;
+  declines: number;
+  unchanged: number;
+  netAdvances: number;
+  mco: number;           // McClellan Oscillator
+  mcsi: number;          // McClellan Summation Index
+  mcoZscore: number;     // Z-score of MCO (252-day)
+  mcsiZscore: number;    // Z-score of MCSI (252-day)
+}
+
+/**
+ * Calculate EMA
+ */
+function calculateEMA(values: number[], period: number): number[] {
+  const ema: number[] = [];
+  const multiplier = 2 / (period + 1);
+
+  // Start with SMA for first value
+  let sum = 0;
+  for (let i = 0; i < Math.min(period, values.length); i++) {
+    sum += values[i];
+  }
+  ema.push(sum / Math.min(period, values.length));
+
+  // Calculate EMA for rest
+  for (let i = 1; i < values.length; i++) {
+    const prev = ema[i - 1];
+    ema.push((values[i] - prev) * multiplier + prev);
+  }
+
+  return ema;
+}
+
+/**
+ * Calculate z-score over a rolling window
+ */
+function calculateZscore(values: number[], window: number = 252): number[] {
+  const zscores: number[] = [];
+
+  for (let i = 0; i < values.length; i++) {
+    if (i < window - 1) {
+      // Not enough data for full window, use what we have
+      const slice = values.slice(0, i + 1);
+      const mean = slice.reduce((a, b) => a + b, 0) / slice.length;
+      const variance = slice.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / slice.length;
+      const stdev = Math.sqrt(variance);
+      zscores.push(stdev > 0 ? (values[i] - mean) / stdev : 0);
+    } else {
+      const slice = values.slice(i - window + 1, i + 1);
+      const mean = slice.reduce((a, b) => a + b, 0) / slice.length;
+      const variance = slice.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / slice.length;
+      const stdev = Math.sqrt(variance);
+      zscores.push(stdev > 0 ? (values[i] - mean) / stdev : 0);
+    }
+  }
+
+  return zscores;
+}
+
+/**
+ * Calculate Nasdaq 100 MCO and MCSI from OHLC data
+ *
+ * MCO = 19-day EMA(Net Advances) - 39-day EMA(Net Advances)
+ * MCSI = Cumulative sum of MCO (starting from 0)
+ *
+ * @param ohlcCache - Map of ticker -> OHLC bars
+ * @param tickers - List of tickers to include (Nasdaq 100)
+ * @returns Map of date -> BreadthData
+ */
+export function calculateNasdaq100Breadth(
+  ohlcCache: Map<string, OHLC[]>,
+  tickers: string[] = NASDAQ_100_TICKERS
+): Map<string, BreadthData> {
+  // Get all unique dates across all tickers
+  const allDates = new Set<string>();
+  for (const ticker of tickers) {
+    const bars = ohlcCache.get(ticker);
+    if (bars) {
+      for (const bar of bars) {
+        allDates.add(bar.date);
+      }
+    }
+  }
+
+  const sortedDates = Array.from(allDates).sort();
+  if (sortedDates.length < 2) {
+    return new Map();
+  }
+
+  // Build daily advance/decline counts
+  const dailyData: { date: string; advances: number; declines: number; unchanged: number }[] = [];
+
+  for (let i = 1; i < sortedDates.length; i++) {
+    const today = sortedDates[i];
+    const yesterday = sortedDates[i - 1];
+
+    let advances = 0;
+    let declines = 0;
+    let unchanged = 0;
+
+    for (const ticker of tickers) {
+      const bars = ohlcCache.get(ticker);
+      if (!bars) continue;
+
+      const todayBar = bars.find(b => b.date === today);
+      const yesterdayBar = bars.find(b => b.date === yesterday);
+
+      if (todayBar && yesterdayBar) {
+        if (todayBar.close > yesterdayBar.close) {
+          advances++;
+        } else if (todayBar.close < yesterdayBar.close) {
+          declines++;
+        } else {
+          unchanged++;
+        }
+      }
+    }
+
+    dailyData.push({ date: today, advances, declines, unchanged });
+  }
+
+  if (dailyData.length < 39) {
+    console.warn("[Breadth] Not enough data for MCO calculation (need 39+ days)");
+    return new Map();
+  }
+
+  // Calculate net advances
+  const netAdvances = dailyData.map(d => d.advances - d.declines);
+
+  // Calculate EMAs
+  const ema19 = calculateEMA(netAdvances, 19);
+  const ema39 = calculateEMA(netAdvances, 39);
+
+  // Calculate MCO = EMA19 - EMA39
+  const mcoValues: number[] = [];
+  for (let i = 0; i < netAdvances.length; i++) {
+    mcoValues.push(ema19[i] - ema39[i]);
+  }
+
+  // Calculate MCSI = cumulative sum of MCO
+  const mcsiValues: number[] = [];
+  let runningSum = 0;
+  for (const mco of mcoValues) {
+    runningSum += mco;
+    mcsiValues.push(runningSum);
+  }
+
+  // Calculate z-scores
+  const mcoZscores = calculateZscore(mcoValues, 252);
+  const mcsiZscores = calculateZscore(mcsiValues, 252);
+
+  // Build result map
+  const result = new Map<string, BreadthData>();
+  for (let i = 0; i < dailyData.length; i++) {
+    const d = dailyData[i];
+    result.set(d.date, {
+      date: d.date,
+      advances: d.advances,
+      declines: d.declines,
+      unchanged: d.unchanged,
+      netAdvances: netAdvances[i],
+      mco: Math.round(mcoValues[i] * 100) / 100,
+      mcsi: Math.round(mcsiValues[i] * 100) / 100,
+      mcoZscore: Math.round(mcoZscores[i] * 100) / 100,
+      mcsiZscore: Math.round(mcsiZscores[i] * 100) / 100,
+    });
+  }
+
+  return result;
 }
 
 // =============================================================================
@@ -934,6 +1167,8 @@ const NASDAQ_100_TICKERS = [
 // Exports
 // =============================================================================
 
+export { NASDAQ_100_TICKERS };
+
 export default {
   loadNewsletterData,
   loadDiscordTrades,
@@ -943,5 +1178,6 @@ export default {
   getStockDataAsOf,
   batchGetStockData,
   buildDailyContext,
+  calculateNasdaq100Breadth,
   HistoricalDataLoader,
 };

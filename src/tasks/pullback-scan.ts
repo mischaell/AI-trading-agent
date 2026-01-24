@@ -400,24 +400,52 @@ function calculateGrade(
 // =============================================================================
 
 /**
- * Sort candidates by grade (A > B > C), then by RS (descending)
+ * Calculate backtest-style score for sorting
+ */
+function calculateBacktestScore(data: PullbackTickerData): number {
+  const distAbs = Math.abs(data.dist_21ema_atr);
+  const structureIntact = data.close >= data.ema21_low;
+
+  // Grade score
+  let gradeScore: number;
+  if (distAbs <= 0.3 && data.is_contracting && data.close_range_pct >= 60 && structureIntact) {
+    gradeScore = 30; // A
+  } else if (distAbs <= 0.7 && data.close_range_pct >= 40 && structureIntact) {
+    gradeScore = 20; // B
+  } else {
+    gradeScore = 10; // C
+  }
+
+  // Distance score
+  const distScore = distAbs <= 0.5 ? 25 : distAbs <= 1.0 ? 15 : 5;
+
+  // Mode score
+  const priceAboveStructure = data.close > data.ema21_close;
+  const isMode2 = priceAboveStructure && data.dist_21ema_atr >= 0 && data.dist_21ema_atr <= 0.5;
+  const modeScore = isMode2 ? 15 : 10;
+
+  // Contraction score
+  const contractionScore = data.is_contracting ? 10 : 0;
+
+  // RS score
+  const rsScore = data.rs >= 90 ? 10 : data.rs >= 80 ? 7 : 4;
+
+  return gradeScore + distScore + modeScore + contractionScore + rsScore;
+}
+
+/**
+ * Sort candidates by backtest-style score (highest first)
  */
 function sortCandidates(
   candidates: Array<{ data: PullbackTickerData; result: PullbackFilterResult }>
 ): Array<{ data: PullbackTickerData; result: PullbackFilterResult }> {
-  const gradeOrder: Record<ReadinessGrade, number> = { A: 0, B: 1, C: 2 };
-
   return [...candidates].sort((a, b) => {
-    // Primary: Grade (A first)
-    const gradeCompare = gradeOrder[a.result.grade] - gradeOrder[b.result.grade];
-    if (gradeCompare !== 0) return gradeCompare;
+    // Primary: Backtest score (higher first)
+    const scoreA = calculateBacktestScore(a.data);
+    const scoreB = calculateBacktestScore(b.data);
+    if (scoreB !== scoreA) return scoreB - scoreA;
 
-    // Secondary: Score (higher first)
-    if (b.result.score !== a.result.score) {
-      return b.result.score - a.result.score;
-    }
-
-    // Tertiary: RS (higher first)
+    // Secondary: RS (higher first)
     return b.data.rs - a.data.rs;
   });
 }
@@ -430,6 +458,36 @@ function toPullbackCandidate(
   result: PullbackFilterResult,
   rank: number
 ): PullbackCandidate {
+  // Calculate backtest-style Grade (A/B/C)
+  const distAbs = Math.abs(data.dist_21ema_atr);
+  const structureIntact = data.close >= data.ema21_low;
+  let grade: 'A' | 'B' | 'C';
+  if (distAbs <= 0.3 && data.is_contracting && data.close_range_pct >= 60 && structureIntact) {
+    grade = 'A';
+  } else if (distAbs <= 0.7 && data.close_range_pct >= 40 && structureIntact) {
+    grade = 'B';
+  } else {
+    grade = 'C';
+  }
+
+  // Calculate Mode (MODE1/MODE2)
+  const priceAboveStructure = data.close > data.ema21_close;
+  const mode: 'MODE1' | 'MODE2' = (priceAboveStructure && data.dist_21ema_atr >= 0 && data.dist_21ema_atr <= 0.5)
+    ? 'MODE2' // Reclaim & backtest
+    : 'MODE1'; // Weakness into structure
+
+  // Setup type description
+  let setupType = mode === 'MODE2' ? 'reclaim & backtest' : 'weakness into structure';
+  if (data.is_contracting) setupType += ' + contraction';
+
+  // Calculate Score using backtest weights
+  const gradeScore = grade === 'A' ? 30 : grade === 'B' ? 20 : 10;
+  const distScore = distAbs <= 0.5 ? 25 : distAbs <= 1.0 ? 15 : 5;
+  const modeScore = mode === 'MODE2' ? 15 : 10;
+  const contractionScore = data.is_contracting ? 10 : 0;
+  const rsScore = data.rs >= 90 ? 10 : data.rs >= 80 ? 7 : 4;
+  const score = gradeScore + distScore + modeScore + contractionScore + rsScore;
+
   return {
     rank,
     ticker: data.ticker,
@@ -444,6 +502,13 @@ function toPullbackCandidate(
     weekly_return_pct: data.weekly_return_pct,
     earnings_days: data.earnings_days,
     ready_grade: result.grade,
+    // Backtest-style scoring fields
+    grade,
+    mode,
+    setup_type: setupType,
+    score,
+    ema21_close: data.ema21_close,
+    structure_intact: structureIntact,
   };
 }
 

@@ -26,7 +26,7 @@ import {
   OrderType,
   TimeInForce,
 } from '@/types';
-import { SizingOutput, SizingBatchOutput, WithholdReason } from '@/types';
+import { SizingOutput, SizingBatchOutput, WithholdReason, SizingMultipliers, SizingActionType } from '@/types';
 import { EntryMode } from '@/types';
 
 // =============================================================================
@@ -45,10 +45,58 @@ export interface ExecutionPlanEntry extends ExecutionPlanOutput {
   r_per_share: number;
   /** Position value in dollars */
   position_dollars: number;
+  /** Position as percentage of equity */
+  position_percent: number;
   /** EC risk as percentage */
   ec_risk_pct: number;
   /** Human-readable stop instruction */
   stop_instruction: string;
+
+  // === NEW: Discord format fields ===
+
+  /** Sizing multipliers used */
+  multipliers?: SizingMultipliers;
+  /** Action type: NEW_ENTRY or ADD */
+  action_type?: SizingActionType;
+  /** Discord format line 1: "Long 12% AAPL @ 145.50" */
+  discord_format?: string;
+  /** Trim fraction: "1/3" */
+  trim_fraction?: string;
+  /** Target R multiple: 2 */
+  trim_target_r?: number;
+
+  // === Backtest-Style Scoring Fields ===
+
+  /** Setup grade: A (perfect), B (good), C (acceptable) */
+  grade?: 'A' | 'B' | 'C';
+  /** Total score based on backtest weights */
+  score?: number;
+  /** Relative strength rating (0-99) */
+  rs?: number;
+  /** Distance to 21EMA in ATR units */
+  dist_21ema_atr?: number;
+  /** Closing range percentage (0-100) */
+  close_range_pct?: number;
+  /** Whether price is contracting */
+  is_contracting?: boolean;
+  /** Setup type description */
+  setup_type?: string;
+}
+
+/**
+ * Discord-formatted trade output
+ */
+export interface DiscordTradeFormat {
+  /** Line 1: "Long 12% AAPL @ 145.50" */
+  line1: string;
+  /** SSL line: "SSL @ 142.30" */
+  ssl: string;
+  /** EC Risk line: "EC Risk: -0.85%" */
+  ecRisk: string;
+  /** Trim line: "Trim: 1/3 at 2R @ 155.20" */
+  trim: string;
+  /** Full formatted text */
+  full: string;
 }
 
 /**
@@ -106,6 +154,67 @@ export const DEFAULT_EXECUTION_CONFIG: Required<ExecutionPlanConfig> = {
   trim_tif: 'GTC',
   max_pain_pct: 2.0,
 };
+
+// =============================================================================
+// Discord Format Helpers (NEW)
+// =============================================================================
+
+/**
+ * Format a trade in Discord equity-trades format
+ *
+ * @param entry - Execution plan entry
+ * @returns DiscordTradeFormat with all formatted lines
+ *
+ * @example
+ * ```
+ * Long 12% GEV @ 661.67
+ * SSL @ 617.52
+ * EC Risk: -0.88%
+ * Trim: 1/3 at 2R @ 749.98
+ * ```
+ */
+export function formatFullDiscordTrade(entry: ExecutionPlanEntry): DiscordTradeFormat {
+  const action = entry.action_type === 'ADD' ? 'ADD' : 'Long';
+  const pct = Math.round(entry.position_percent);
+
+  const line1 = `${action} ${pct}% ${entry.ticker} @ ${entry.entry_price.toFixed(2)}`;
+  const ssl = `SSL @ ${entry.stop.ssl.toFixed(2)}`;
+  const ecRisk = `EC Risk: -${entry.ec_risk_pct.toFixed(2)}%`;
+  const trim = `Trim: 1/3 at 2R @ ${entry.profit.trim_2r.price.toFixed(2)}`;
+
+  return {
+    line1,
+    ssl,
+    ecRisk,
+    trim,
+    full: `${line1}\n${ssl}\n${ecRisk}\n${trim}`,
+  };
+}
+
+/**
+ * Format short discord trade line
+ */
+export function formatShortDiscordTrade(entry: ExecutionPlanEntry): string {
+  const action = entry.action_type === 'ADD' ? 'ADD' : 'Long';
+  const pct = Math.round(entry.position_percent);
+  return `${action} ${pct}% ${entry.ticker} @ ${entry.entry_price.toFixed(2)}`;
+}
+
+/**
+ * Format execution plan as Discord-style trade list
+ */
+export function formatDiscordExecutionPlan(plan: FullExecutionPlanOutput): string {
+  const lines: string[] = [];
+
+  for (const entry of plan.passed) {
+    const trade = formatFullDiscordTrade(entry);
+    lines.push(trade.full);
+    lines.push(`Shares: ${entry.entry.shares}  |  Position: $${Math.round(entry.position_dollars / 1000) * 1000}`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
 
 // =============================================================================
 // Decimal Helpers
@@ -269,8 +378,23 @@ export function generateSingleExecutionPlan(
     entry_price: sizing.entry,
     r_per_share: rPerShare.toNumber(),
     position_dollars: sizing.position_dollars,
+    position_percent: sizing.position_percent,
     ec_risk_pct: sizing.ec_risk_percent,
     stop_instruction: generateStopInstruction(ssl),
+    // NEW: Discord format fields
+    multipliers: sizing.multipliers,
+    action_type: sizing.action_type || 'NEW_ENTRY',
+    discord_format: sizing.discord_format,
+    trim_fraction: sizing.trim_fraction || '1/3',
+    trim_target_r: sizing.trim_target_r || 2,
+    // Backtest-style scoring fields
+    grade: sizing.grade,
+    score: sizing.score,
+    rs: sizing.rs,
+    dist_21ema_atr: sizing.dist_21ema_atr,
+    close_range_pct: sizing.close_range_pct,
+    is_contracting: sizing.is_contracting,
+    setup_type: sizing.setup_type,
   };
 
   return plan;

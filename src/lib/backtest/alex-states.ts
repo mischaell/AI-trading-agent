@@ -35,10 +35,17 @@ export interface StateSignal {
   context: string;         // Relevant snippet
 }
 
+export interface BreadthSignal {
+  indicator: "MCSI" | "MCO" | "BREADTH_EXT";
+  direction: "HOOK_UP" | "HOOK_DOWN" | "OVERBOUGHT" | "OVERSOLD" | "NEUTRAL";
+  context: string;
+}
+
 export interface DailyState {
   date: string;
   primaryState: AlexState;
   signals: StateSignal[];
+  breadthSignals: BreadthSignal[];
   entries: JournalEntry[];
   summary: {
     testingScore: number;
@@ -46,6 +53,12 @@ export interface DailyState {
     trimmingScore: number;
     defensiveScore: number;
     sellingScore: number;
+  };
+  breadthSummary: {
+    mcsiDirection: "UP" | "DOWN" | "NEUTRAL";
+    mcoDirection: "UP" | "DOWN" | "OVERBOUGHT" | "OVERSOLD" | "NEUTRAL";
+    breadthExtDirection: "UP" | "DOWN" | "NEUTRAL";
+    overallBreadth: "BULLISH" | "BEARISH" | "MIXED" | "NEUTRAL";
   };
 }
 
@@ -75,13 +88,29 @@ const STATE_PATTERNS: Record<AlexState, { keywords: string[]; phrases: string[];
       "ramp up", "scale up"
     ],
     phrases: [
+      // Original pressing patterns
       "allow myself to push", "allow myself to be more aggressive",
       "delta positive", "delta is positive", "cushion allow",
       "traction allow", "got traction", "gaining cushion", "positive delta",
       "fully invested", "aggressive progressive", "press a bit",
       "push a bit", "allow myself to", "i am being aggressive",
       "adding to my", "adding to core", "add long", "add-on",
-      "adding another", "adding back"
+      "adding another", "adding back",
+      // MCSI bullish patterns (hook-up = aggressive)
+      "mcsi hook-up", "mcsi hooking up", "mcsi curling up", "mcsi trying to hook-up",
+      "mcsi trending up", "mcsi uptrend", "mcsi in uptrend",
+      "mcsi above 10dma", "mcsi above the 10dma", "mcsi reclaiming 10dma",
+      "mcsi above 10d", "mcsi re-acceleration", "mcsi firmly up",
+      "solid mcsi hook-up", "mcsi hook-up is solid", "mcsi hook-up holds",
+      "mcsi confirming", "mcsi still up",
+      // MCO bullish patterns (hook-up from oversold = aggressive opportunity)
+      "mco hook-up", "mco hooked up", "mco flipped green", "mco flipped positive",
+      "mco oversold hook-up", "mco from os", "mco from oversold",
+      "mco at -2sigma", "mco at -1sigma", "mco deep oversold",
+      // Breadth expansion patterns
+      "breadth ext. hook-up", "breadth extension hook-up", "breadth hook-up",
+      "breadth still expanding", "breadth still expending",
+      "breadth thrust"
     ],
     weight: 1.2
   },
@@ -92,10 +121,18 @@ const STATE_PATTERNS: Record<AlexState, { keywords: string[]; phrases: string[];
       "scale down", "scaling down", "lightening", "1/3 runner", "runners"
     ],
     phrases: [
+      // Original trimming patterns
       "trim into strength", "trimming into strength", "reduce my exposure",
       "reducing exposure", "down to 1/3", "taking profits", "lock in gains",
       "securing profits", "scale down exposure", "trim my extended",
-      "trim at the close", "another trim", "continue to trim"
+      "trim at the close", "another trim", "continue to trim",
+      // MCO overbought patterns (signals to trim into strength)
+      "mco in the top", "mco overbought", "mco ob area", "mco in ob",
+      "mco getting stretched", "mco short-term stretched",
+      "mco record levels", "mco extended",
+      // Breadth overbought patterns
+      "breadth hitting 90%", "breadth 90%+", "st breadth hitting",
+      "st ob condition", "short-term stretched"
     ],
     weight: 1.0
   },
@@ -106,11 +143,25 @@ const STATE_PATTERNS: Record<AlexState, { keywords: string[]; phrases: string[];
       "dangerous", "no trades", "sitting tight", "protect"
     ],
     phrases: [
+      // Original defensive patterns
       "cash is a position", "cash is position", "capital preservation",
       "no trades planned", "protect your capital", "be safe",
       "dangerous market", "not to be aggressive", "less is more",
       "choppy market", "nothing to do", "fat pitch is not here",
-      "manage my risk", "managing risk", "reduce exposure"
+      "manage my risk", "managing risk", "reduce exposure",
+      // MCSI bearish patterns (hook-down = defensive)
+      "mcsi hook-down", "mcsi hooking down", "mcsi hooked down",
+      "mcsi downtrend", "mcsi accelerating to the downside",
+      "mcsi below 10dma", "mcsi below the 10dma", "mcsi below 10d",
+      "mcsi reconfirmation to the downside", "mcsi re hooked down",
+      "mcsi trying to flatten", "mcsi flattening",
+      // MCO bearish patterns (hook-down = defensive)
+      "mco hook-down", "mco hooking down", "mco hooked-down",
+      "mco not oversold", "mco showing no life",
+      // Breadth contraction patterns
+      "breadth ext. hook-down", "breadth extension hooking down", "breadth hook-down",
+      "breadth contracting", "breadth deterioration",
+      "breadth ext. hooked-down", "st breadth hooking-down"
     ],
     weight: 1.2
   },
@@ -124,6 +175,7 @@ const STATE_PATTERNS: Record<AlexState, { keywords: string[]; phrases: string[];
       "qqqe below 21dma-structure", "qqqe losing the 21dma-structure",
       "qqqe closing below 21dma-structure", "qqqe lost the 21dma",
       "qqqe below 21dma", "qqqe losing 21dma",
+      "qqqe closing dead low", "qqqe < declining 21dma",
       // All cash signals
       "going all cash", "going to cash",
       "closed all positions", "closing all positions",
@@ -141,6 +193,231 @@ const STATE_PATTERNS: Record<AlexState, { keywords: string[]; phrases: string[];
     weight: 0
   }
 };
+
+// =============================================================================
+// Breadth Signal Detection
+// =============================================================================
+
+const BREADTH_PATTERNS = {
+  MCSI: {
+    HOOK_UP: [
+      "mcsi hook-up", "mcsi hooking up", "mcsi curling up", "mcsi trying to hook-up",
+      "mcsi trending up", "mcsi uptrend", "mcsi in uptrend", "mcsi confirming",
+      "mcsi above 10dma", "mcsi above the 10dma", "mcsi reclaiming 10dma",
+      "mcsi re-acceleration", "mcsi firmly up", "solid mcsi hook-up",
+      "mcsi hook-up holds", "mcsi hook-up is solid", "mcsi still up"
+    ],
+    HOOK_DOWN: [
+      "mcsi hook-down", "mcsi hooking down", "mcsi hooked down",
+      "mcsi downtrend", "mcsi accelerating to the downside",
+      "mcsi below 10dma", "mcsi below the 10dma", "mcsi below 10d",
+      "mcsi reconfirmation to the downside", "mcsi re hooked down",
+      "mcsi trying to flatten", "mcsi flattening"
+    ]
+  },
+  MCO: {
+    HOOK_UP: [
+      "mco hook-up", "mco hooked up", "mco flipped green", "mco flipped positive",
+      "mco oversold hook-up", "mco from os", "mco from oversold",
+      "mco increased", "mco following through"
+    ],
+    HOOK_DOWN: [
+      "mco hook-down", "mco hooking down", "mco hooked-down",
+      "mco showing no life", "mco cooling off"
+    ],
+    OVERBOUGHT: [
+      "mco in the top", "mco overbought", "mco ob area", "mco in ob",
+      "mco getting stretched", "mco short-term stretched",
+      "mco record levels", "mco extended", "mco not yet ob"
+    ],
+    OVERSOLD: [
+      "mco at -2sigma", "mco at -1sigma", "mco deep oversold",
+      "mco oversold", "mco not oversold", "mco approach oversold"
+    ]
+  },
+  BREADTH_EXT: {
+    HOOK_UP: [
+      "breadth ext. hook-up", "breadth extension hook-up", "breadth hook-up",
+      "breadth still expanding", "breadth still expending",
+      "breadth thrust", "st breadth extension hook-up"
+    ],
+    HOOK_DOWN: [
+      "breadth ext. hook-down", "breadth extension hooking down", "breadth hook-down",
+      "breadth contracting", "breadth deterioration",
+      "breadth ext. hooked-down", "st breadth hooking-down"
+    ]
+  }
+};
+
+function detectBreadthSignals(content: string): BreadthSignal[] {
+  const signals: BreadthSignal[] = [];
+  const lowerContent = content.toLowerCase();
+
+  // Check MCSI patterns
+  for (const pattern of BREADTH_PATTERNS.MCSI.HOOK_UP) {
+    if (lowerContent.includes(pattern)) {
+      const idx = lowerContent.indexOf(pattern);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(content.length, idx + 60);
+      signals.push({
+        indicator: "MCSI",
+        direction: "HOOK_UP",
+        context: content.substring(start, end).trim()
+      });
+      break;
+    }
+  }
+
+  for (const pattern of BREADTH_PATTERNS.MCSI.HOOK_DOWN) {
+    if (lowerContent.includes(pattern)) {
+      const idx = lowerContent.indexOf(pattern);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(content.length, idx + 60);
+      signals.push({
+        indicator: "MCSI",
+        direction: "HOOK_DOWN",
+        context: content.substring(start, end).trim()
+      });
+      break;
+    }
+  }
+
+  // Check MCO patterns
+  for (const pattern of BREADTH_PATTERNS.MCO.HOOK_UP) {
+    if (lowerContent.includes(pattern)) {
+      const idx = lowerContent.indexOf(pattern);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(content.length, idx + 60);
+      signals.push({
+        indicator: "MCO",
+        direction: "HOOK_UP",
+        context: content.substring(start, end).trim()
+      });
+      break;
+    }
+  }
+
+  for (const pattern of BREADTH_PATTERNS.MCO.HOOK_DOWN) {
+    if (lowerContent.includes(pattern)) {
+      const idx = lowerContent.indexOf(pattern);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(content.length, idx + 60);
+      signals.push({
+        indicator: "MCO",
+        direction: "HOOK_DOWN",
+        context: content.substring(start, end).trim()
+      });
+      break;
+    }
+  }
+
+  for (const pattern of BREADTH_PATTERNS.MCO.OVERBOUGHT) {
+    if (lowerContent.includes(pattern)) {
+      const idx = lowerContent.indexOf(pattern);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(content.length, idx + 60);
+      signals.push({
+        indicator: "MCO",
+        direction: "OVERBOUGHT",
+        context: content.substring(start, end).trim()
+      });
+      break;
+    }
+  }
+
+  for (const pattern of BREADTH_PATTERNS.MCO.OVERSOLD) {
+    if (lowerContent.includes(pattern)) {
+      const idx = lowerContent.indexOf(pattern);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(content.length, idx + 60);
+      signals.push({
+        indicator: "MCO",
+        direction: "OVERSOLD",
+        context: content.substring(start, end).trim()
+      });
+      break;
+    }
+  }
+
+  // Check Breadth Extension patterns
+  for (const pattern of BREADTH_PATTERNS.BREADTH_EXT.HOOK_UP) {
+    if (lowerContent.includes(pattern)) {
+      const idx = lowerContent.indexOf(pattern);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(content.length, idx + 60);
+      signals.push({
+        indicator: "BREADTH_EXT",
+        direction: "HOOK_UP",
+        context: content.substring(start, end).trim()
+      });
+      break;
+    }
+  }
+
+  for (const pattern of BREADTH_PATTERNS.BREADTH_EXT.HOOK_DOWN) {
+    if (lowerContent.includes(pattern)) {
+      const idx = lowerContent.indexOf(pattern);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(content.length, idx + 60);
+      signals.push({
+        indicator: "BREADTH_EXT",
+        direction: "HOOK_DOWN",
+        context: content.substring(start, end).trim()
+      });
+      break;
+    }
+  }
+
+  return signals;
+}
+
+function determineBreadthSummary(signals: BreadthSignal[]): DailyState["breadthSummary"] {
+  // Default to neutral
+  let mcsiDirection: "UP" | "DOWN" | "NEUTRAL" = "NEUTRAL";
+  let mcoDirection: "UP" | "DOWN" | "OVERBOUGHT" | "OVERSOLD" | "NEUTRAL" = "NEUTRAL";
+  let breadthExtDirection: "UP" | "DOWN" | "NEUTRAL" = "NEUTRAL";
+
+  // Get the most recent signal for each indicator (last one wins)
+  for (const signal of signals) {
+    if (signal.indicator === "MCSI") {
+      mcsiDirection = signal.direction === "HOOK_UP" ? "UP" : signal.direction === "HOOK_DOWN" ? "DOWN" : "NEUTRAL";
+    } else if (signal.indicator === "MCO") {
+      mcoDirection = signal.direction === "HOOK_UP" ? "UP" :
+                     signal.direction === "HOOK_DOWN" ? "DOWN" :
+                     signal.direction === "OVERBOUGHT" ? "OVERBOUGHT" :
+                     signal.direction === "OVERSOLD" ? "OVERSOLD" : "NEUTRAL";
+    } else if (signal.indicator === "BREADTH_EXT") {
+      breadthExtDirection = signal.direction === "HOOK_UP" ? "UP" : signal.direction === "HOOK_DOWN" ? "DOWN" : "NEUTRAL";
+    }
+  }
+
+  // Calculate overall breadth sentiment
+  let bullishCount = 0;
+  let bearishCount = 0;
+
+  if (mcsiDirection === "UP") bullishCount++;
+  else if (mcsiDirection === "DOWN") bearishCount++;
+
+  if (mcoDirection === "UP" || mcoDirection === "OVERSOLD") bullishCount++; // Oversold = bounce opportunity
+  else if (mcoDirection === "DOWN" || mcoDirection === "OVERBOUGHT") bearishCount++; // OB = trim signal
+
+  if (breadthExtDirection === "UP") bullishCount++;
+  else if (breadthExtDirection === "DOWN") bearishCount++;
+
+  let overallBreadth: "BULLISH" | "BEARISH" | "MIXED" | "NEUTRAL" = "NEUTRAL";
+  if (bullishCount >= 2 && bearishCount === 0) overallBreadth = "BULLISH";
+  else if (bearishCount >= 2 && bullishCount === 0) overallBreadth = "BEARISH";
+  else if (bullishCount > 0 && bearishCount > 0) overallBreadth = "MIXED";
+  else if (bullishCount === 1) overallBreadth = "BULLISH";
+  else if (bearishCount === 1) overallBreadth = "BEARISH";
+
+  return {
+    mcsiDirection,
+    mcoDirection,
+    breadthExtDirection,
+    overallBreadth
+  };
+}
 
 // =============================================================================
 // State Detection Functions
@@ -284,12 +561,14 @@ function aggregateDailyStates(entries: JournalEntry[]): Map<string, DailyState> 
 
   for (const entry of entries) {
     const signals = detectState(entry.content);
+    const breadthSignals = detectBreadthSignals(entry.content);
 
     if (!dailyStates.has(entry.date)) {
       dailyStates.set(entry.date, {
         date: entry.date,
         primaryState: "NEUTRAL",
         signals: [],
+        breadthSignals: [],
         entries: [],
         summary: {
           testingScore: 0,
@@ -297,6 +576,12 @@ function aggregateDailyStates(entries: JournalEntry[]): Map<string, DailyState> 
           trimmingScore: 0,
           defensiveScore: 0,
           sellingScore: 0
+        },
+        breadthSummary: {
+          mcsiDirection: "NEUTRAL",
+          mcoDirection: "NEUTRAL",
+          breadthExtDirection: "NEUTRAL",
+          overallBreadth: "NEUTRAL"
         }
       });
     }
@@ -304,6 +589,7 @@ function aggregateDailyStates(entries: JournalEntry[]): Map<string, DailyState> 
     const daily = dailyStates.get(entry.date)!;
     daily.entries.push(entry);
     daily.signals.push(...signals);
+    daily.breadthSignals.push(...breadthSignals);
 
     // Aggregate scores
     for (const signal of signals) {
@@ -327,9 +613,10 @@ function aggregateDailyStates(entries: JournalEntry[]): Map<string, DailyState> 
     }
   }
 
-  // Determine primary state for each day
+  // Determine primary state and breadth summary for each day
   for (const daily of dailyStates.values()) {
     daily.primaryState = determinePrimaryState(daily.signals);
+    daily.breadthSummary = determineBreadthSummary(daily.breadthSignals);
   }
 
   return dailyStates;
@@ -398,32 +685,54 @@ function analyzeStateTransitions(dailyStates: Map<string, DailyState>): void {
 function printDailyStateTable(dailyStates: Map<string, DailyState>, limit: number = 30): void {
   const dates = Array.from(dailyStates.keys()).sort().slice(-limit);
 
-  console.log("\n" + "=".repeat(100));
-  console.log("                              DAILY ALEX STATES (Last " + limit + " days)");
-  console.log("=".repeat(100));
-  console.log("┌────────────┬────────────┬─────────┬─────────┬─────────┬─────────┬─────────┬────────────────────────┐");
-  console.log("│    Date    │   State    │ Testing │ Pressing│ Trimming│Defensive│ Selling │ Top Signal             │");
-  console.log("├────────────┼────────────┼─────────┼─────────┼─────────┼─────────┼─────────┼────────────────────────┤");
+  console.log("\n" + "=".repeat(120));
+  console.log("                                      DAILY ALEX STATES (Last " + limit + " days)");
+  console.log("=".repeat(120));
+  console.log("┌────────────┬────────────┬─────────┬─────────┬─────────┬──────┬──────┬────────┬─────────┬───────────────────────┐");
+  console.log("│    Date    │   State    │  MCSI   │   MCO   │ Breadth │Bullsh│Bearsh│Overall │ Primary │ Top Signal            │");
+  console.log("├────────────┼────────────┼─────────┼─────────┼─────────┼──────┼──────┼────────┼─────────┼───────────────────────┤");
 
   for (const date of dates) {
     const daily = dailyStates.get(date)!;
+    const b = daily.breadthSummary;
     const s = daily.summary;
+
+    // Format breadth indicators with arrows
+    const mcsiIcon = b.mcsiDirection === "UP" ? "↑" : b.mcsiDirection === "DOWN" ? "↓" : "─";
+    const mcoIcon = b.mcoDirection === "UP" ? "↑" :
+                    b.mcoDirection === "DOWN" ? "↓" :
+                    b.mcoDirection === "OVERBOUGHT" ? "OB" :
+                    b.mcoDirection === "OVERSOLD" ? "OS" : "─";
+    const breadthIcon = b.breadthExtDirection === "UP" ? "↑" : b.breadthExtDirection === "DOWN" ? "↓" : "─";
+    const overallIcon = b.overallBreadth === "BULLISH" ? "🟢" :
+                        b.overallBreadth === "BEARISH" ? "🔴" :
+                        b.overallBreadth === "MIXED" ? "🟡" : "⚪";
+
+    // Calculate bullish/bearish scores from summary
+    const bullishScore = s.pressingScore + s.testingScore * 0.5;
+    const bearishScore = s.defensiveScore + s.trimmingScore * 0.5 + s.sellingScore * 2;
+
     const topSignal = daily.signals.length > 0
-      ? daily.signals[0].keywords[0]?.substring(0, 22) || ""
+      ? daily.signals[0].keywords[0]?.substring(0, 21) || ""
       : "";
 
     console.log(
       `│ ${date} │ ${daily.primaryState.padEnd(10)} │ ` +
-      `${s.testingScore.toFixed(1).padStart(7)} │ ` +
-      `${s.pressingScore.toFixed(1).padStart(7)} │ ` +
-      `${s.trimmingScore.toFixed(1).padStart(7)} │ ` +
-      `${s.defensiveScore.toFixed(1).padStart(7)} │ ` +
-      `${s.sellingScore.toFixed(1).padStart(7)} │ ` +
-      `${topSignal.padEnd(22)} │`
+      `${mcsiIcon.padStart(4)}    │ ` +
+      `${mcoIcon.padStart(4)}    │ ` +
+      `${breadthIcon.padStart(4)}    │ ` +
+      `${bullishScore.toFixed(1).padStart(5)} │ ` +
+      `${bearishScore.toFixed(1).padStart(5)} │ ` +
+      `${overallIcon}      │ ` +
+      `${daily.primaryState.substring(0, 7).padEnd(7)} │ ` +
+      `${topSignal.padEnd(21)} │`
     );
   }
 
-  console.log("└────────────┴────────────┴─────────┴─────────┴─────────┴─────────┴─────────┴────────────────────────┘");
+  console.log("└────────────┴────────────┴─────────┴─────────┴─────────┴──────┴──────┴────────┴─────────┴───────────────────────┘");
+
+  // Breadth Summary Legend
+  console.log("\n📊 BREADTH LEGEND: MCSI/MCO/Breadth: ↑=Hook-up ↓=Hook-down OB=Overbought OS=Oversold | Overall: 🟢=Bullish 🔴=Bearish 🟡=Mixed ⚪=Neutral");
 }
 
 function exportDailyStates(dailyStates: Map<string, DailyState>): object[] {
@@ -667,10 +976,13 @@ async function main() {
 export {
   detectState,
   determinePrimaryState,
+  detectBreadthSignals,
+  determineBreadthSummary,
   loadJournalEntries,
   aggregateDailyStates,
   exportDailyStates,
-  STATE_PATTERNS
+  STATE_PATTERNS,
+  BREADTH_PATTERNS
 };
 
 // Run if executed directly (not imported as module)

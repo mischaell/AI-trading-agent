@@ -51,6 +51,19 @@ export interface FocusListCandidate {
   reclaim_backtest_grade: ReclaimBacktestGrade;
   /** Whether this candidate was manually promoted */
   is_promoted?: boolean;
+
+  // === Backtest-Style Scoring Fields ===
+
+  /** Total score based on backtest weights */
+  score?: number;
+  /** Relative strength rating */
+  rs?: number;
+  /** Current price */
+  price?: number;
+  /** Close range percentage */
+  close_range_pct?: number;
+  /** Whether contracting */
+  is_contracting?: boolean;
 }
 
 /**

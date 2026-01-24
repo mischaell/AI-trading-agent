@@ -49,6 +49,9 @@ export {
   type BreadthData,
 } from './breadth';
 
+// NOTE: calculate-breadth.ts is server-only (uses yahoo-finance2 with Node.js modules)
+// Use it via API route /api/breadth-update or run directly with tsx
+
 // Universe Data
 export {
   getNasdaq100Tickers,

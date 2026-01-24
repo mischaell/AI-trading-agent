@@ -14,6 +14,7 @@ export type {
   NewEntriesPermission,
   MarketPermissions,
   MarketStateOutput,
+  BreadthDirection,  // NEW
 } from './market-state';
 
 // Task 2 — Universe Scan
@@ -53,6 +54,8 @@ export type {
   WithholdReason,
   SizingOutput,
   SizingBatchOutput,
+  SizingMultipliers,    // NEW
+  SizingActionType,     // NEW
 } from './sizing';
 
 // Task 7 — Execution Plan

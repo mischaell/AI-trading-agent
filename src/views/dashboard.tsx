@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -302,15 +302,27 @@ function McClellanChart({
 function McClellanPanel({
   mcoZ,
   mcsiZ,
+  mcoValue,
+  mcsiValue,
+  mcoChange,
+  breadthDirection,
+  breadthMultiplier,
+  breadthDate,
   screenshotUrl,
   consensus,
 }: {
   mcoZ: number;
   mcsiZ: number;
+  mcoValue?: number;
+  mcsiValue?: number;
+  mcoChange?: number;
+  breadthDirection?: string;
+  breadthMultiplier?: number;
+  breadthDate?: string;
   screenshotUrl?: string | null;
   consensus?: string;
 }) {
-  // If we have a screenshot, show it instead of mock charts
+  // If we have a screenshot, show it instead of calculated data
   if (screenshotUrl) {
     return (
       <div className="w-full bg-white p-3">
@@ -337,65 +349,112 @@ function McClellanPanel({
     );
   }
 
-  // Fallback to mock charts
-  const mcsi = [
-    -0.2, 0.6, 1.4, 1.8, 1.6, 1.7, 1.5, 1.6, 1.55, 1.5, 1.4, 1.2, 1.0,
-    0.8, 0.7, 0.6, 0.7, 0.6, 0.5, 0.4, 0.2, -0.2, -0.7, -1.2, -0.8,
-    -0.4, 0.1, 0.3, 0.1, -0.1, -0.25, mcsiZ,
-  ];
-  const mcsiMA = mcsi.map((v, i) => {
-    const win = mcsi.slice(Math.max(0, i - 4), i + 1);
-    return win.reduce((a, b) => a + b, 0) / win.length;
-  });
+  // Show calculated breadth data
+  const directionEmoji: Record<string, string> = {
+    'HOOK_UP': '↑',
+    'EXPANDING': '↗',
+    'FLAT': '→',
+    'CONTRACTING': '↘',
+    'HOOK_DOWN': '↓',
+  };
 
-  const mco = [
-    0.2, 1.1, 0.8, 1.0, 0.6, 0.7, 0.2, -0.3, 0.1, 0.5, -0.2, 0.3, 0.0,
-    0.2, 0.6, 0.1, 0.4, 0.7, 0.3, 0.5, 0.1, -0.6, -1.2, -0.2, 1.0, 0.8,
-    0.2, 0.7, -0.4, -0.2, -0.6, mcoZ,
-  ];
+  const directionColor: Record<string, string> = {
+    'HOOK_UP': 'text-emerald-600 bg-emerald-50',
+    'EXPANDING': 'text-emerald-500 bg-emerald-50',
+    'FLAT': 'text-zinc-600 bg-zinc-100',
+    'CONTRACTING': 'text-red-500 bg-red-50',
+    'HOOK_DOWN': 'text-red-600 bg-red-50',
+  };
+
+  const hasCalculatedData = mcoValue !== undefined || mcsiValue !== undefined;
 
   return (
-    <div className="h-full w-full bg-white p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-xs font-semibold text-zinc-900">
-          Normalized McClellan Analysis
+    <div className="h-full w-full bg-white p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="text-sm font-semibold text-zinc-900">
+          Nasdaq-100 Breadth Indicators
         </div>
-        <span className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-[11px] font-semibold text-zinc-600">
-          Mock Data - Upload screenshot to update
+        <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+          hasCalculatedData
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-zinc-200 bg-zinc-100 text-zinc-600'
+        }`}>
+          {hasCalculatedData ? 'Calculated from 100 stocks' : 'Z-scores only'}
         </span>
       </div>
-      <div className="mb-3 flex items-center justify-end gap-2">
-        {["All Markets", "Nasdaq 100", "S&P 500", "Russell 2000", "NYSE"].map(
-          (t, idx) => (
-            <span
-              key={t}
-              className={
-                "rounded-md border px-3 py-1 text-[11px] font-medium " +
-                (idx === 1
-                  ? "border-zinc-900 bg-zinc-900 text-white"
-                  : "border-zinc-200 bg-white text-zinc-700")
-              }
-            >
-              {t}
-            </span>
-          )
-        )}
+
+      {/* Breadth Direction Banner */}
+      {breadthDirection && (
+        <div className={`mb-4 rounded-lg p-4 ${directionColor[breadthDirection] || 'bg-zinc-100'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs uppercase tracking-wide opacity-70">Breadth Direction {breadthDate && <span className="opacity-50">({breadthDate})</span>}</div>
+              <div className="text-2xl font-bold">
+                {breadthDirection.replace('_', ' ')} {directionEmoji[breadthDirection] || ''}
+              </div>
+            </div>
+            {breadthMultiplier !== undefined && (
+              <div className="text-right">
+                <div className="text-xs uppercase tracking-wide opacity-70">Size Multiplier</div>
+                <div className="text-2xl font-bold">{breadthMultiplier.toFixed(2)}x</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MCO and MCSI Cards */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* MCO Card */}
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+          <div className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+            McClellan Oscillator (MCO)
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            {mcoValue !== undefined ? (
+              <>
+                <span className="text-3xl font-bold text-zinc-900">{mcoValue.toFixed(1)}</span>
+                <span className="text-sm text-zinc-500">raw</span>
+              </>
+            ) : (
+              <span className="text-3xl font-bold text-zinc-900">{mcoZ.toFixed(2)}σ</span>
+            )}
+          </div>
+          <div className="mt-2 flex items-center gap-3 text-sm">
+            <span className="text-zinc-500">Z-score: <span className="font-mono font-medium text-zinc-700">{mcoZ.toFixed(2)}σ</span></span>
+            {mcoChange !== undefined && (
+              <span className={`font-mono font-medium ${mcoChange > 0 ? 'text-emerald-600' : mcoChange < 0 ? 'text-red-600' : 'text-zinc-600'}`}>
+                {mcoChange > 0 ? '+' : ''}{mcoChange.toFixed(2)} d/d
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* MCSI Card */}
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+          <div className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+            McClellan Summation Index (MCSI)
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            {mcsiValue !== undefined ? (
+              <>
+                <span className="text-3xl font-bold text-zinc-900">{mcsiValue.toFixed(0)}</span>
+                <span className="text-sm text-zinc-500">raw</span>
+              </>
+            ) : (
+              <span className="text-3xl font-bold text-zinc-900">{mcsiZ.toFixed(2)}σ</span>
+            )}
+          </div>
+          <div className="mt-2 text-sm">
+            <span className="text-zinc-500">Z-score: <span className="font-mono font-medium text-zinc-700">{mcsiZ.toFixed(2)}σ</span></span>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-3">
-        <McClellanChart
-          title="Normalized McClellan Summation Index (MCSI)"
-          series={mcsi}
-          maSeries={mcsiMA}
-          rightTag="Nasdaq 100"
-          rightTagValue={mcsiZ.toFixed(2)}
-        />
-        <McClellanChart
-          title="Normalized McClellan Oscillator (MCO)"
-          series={mco}
-          rightTag="Nasdaq 100"
-          rightTagValue={mcoZ.toFixed(2)}
-        />
+      {/* Info note */}
+      <div className="mt-4 text-xs text-zinc-400">
+        MCO = 19-day EMA(Net Advances) - 39-day EMA(Net Advances). MCSI = Cumulative MCO.
+        Direction based on day-over-day MCO change.
       </div>
     </div>
   );
@@ -1066,15 +1125,51 @@ function ViewMarketState({ state }: { state: AgentState }) {
     localStorage.setItem('breadth_extracted', JSON.stringify(data));
   };
 
+  const clearScreenshot = () => {
+    setScreenshotUrl(null);
+    setExtractedBreadth(null);
+    localStorage.removeItem('breadth_screenshot');
+    localStorage.removeItem('breadth_extracted');
+  };
+
   const rows = useMemo(
-    () => [
-      { k: "QQQE vs 21EMA structure", v: t.qqqe_structure_position.replace("_", " ") },
-      { k: "21EMA structure slope", v: t.qqqe_structure_slope },
-      { k: "MCO (z)", v: `${t.mco_z.toFixed(2)}σ` },
-      { k: "MCSI (z)", v: `${t.mcsi_z.toFixed(2)}σ` },
-      { k: "MCSI slope", v: t.mcsi_slope.replace("_", " ") },
-      { k: "MCSI vs 10DMA", v: t.mcsi_vs_10dma },
-    ],
+    () => {
+      const baseRows = [
+        { k: "QQQE vs 21EMA structure", v: t.qqqe_structure_position.replace("_", " ") },
+        { k: "21EMA structure slope", v: t.qqqe_structure_slope },
+        { k: "MCO (z)", v: `${t.mco_z.toFixed(2)}σ` },
+        { k: "MCSI (z)", v: `${t.mcsi_z.toFixed(2)}σ` },
+        { k: "MCSI slope", v: t.mcsi_slope.replace("_", " ") },
+        { k: "MCSI vs 10DMA", v: t.mcsi_vs_10dma },
+      ];
+
+      // Add calculated breadth fields if available
+      if (t.mco_value !== undefined) {
+        baseRows.push({ k: "MCO (raw)", v: t.mco_value.toFixed(2) });
+      }
+      if (t.mcsi_value !== undefined) {
+        baseRows.push({ k: "MCSI (raw)", v: t.mcsi_value.toFixed(0) });
+      }
+      if (t.mco_change !== undefined) {
+        const changeStr = t.mco_change > 0 ? `+${t.mco_change.toFixed(2)}` : t.mco_change.toFixed(2);
+        baseRows.push({ k: "MCO Change (d/d)", v: changeStr });
+      }
+      if (t.breadth_direction) {
+        const directionEmoji = {
+          'HOOK_UP': '↑',
+          'EXPANDING': '↗',
+          'FLAT': '→',
+          'CONTRACTING': '↘',
+          'HOOK_DOWN': '↓',
+        }[t.breadth_direction] || '';
+        baseRows.push({ k: "Breadth Direction", v: `${t.breadth_direction} ${directionEmoji}` });
+      }
+      if (t.breadth_multiplier !== undefined) {
+        baseRows.push({ k: "Breadth Multiplier", v: `${t.breadth_multiplier.toFixed(2)}x` });
+      }
+
+      return baseRows;
+    },
     [t]
   );
 
@@ -1085,8 +1180,53 @@ function ViewMarketState({ state }: { state: AgentState }) {
     trims: true,
   };
 
+  // Determine state color
+  const stateColors: Record<string, string> = {
+    'CONFIRMED_UPTREND': 'bg-emerald-600',
+    'EARLY_CONFIRMATION': 'bg-emerald-600',
+    'PARTICIPATION_FADE': 'bg-orange-500',
+    'BREAKDOWN': 'bg-red-600',
+    'WASHOUT': 'bg-red-700',
+  };
+
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4">
+      {/* Market State Banner - Top */}
+      <div className={`mb-4 rounded-xl ${stateColors[t.state] || 'bg-zinc-600'} p-4 text-white shadow-lg`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-wide opacity-80">Current Market State</div>
+            <div className="text-3xl font-bold">{t.state.replace(/_/g, ' ')}</div>
+          </div>
+          <div className="flex gap-3">
+            <div className={`rounded-lg px-3 py-2 ${permissions.new_entries === 'YES' ? 'bg-white/20' : 'bg-black/20'}`}>
+              <div className="text-xs opacity-80">New Entries</div>
+              <div className="font-bold">{permissions.new_entries}</div>
+            </div>
+            <div className={`rounded-lg px-3 py-2 ${permissions.adds ? 'bg-white/20' : 'bg-black/20'}`}>
+              <div className="text-xs opacity-80">Adds</div>
+              <div className="font-bold">{permissions.adds ? 'YES' : 'NO'}</div>
+            </div>
+            <div className={`rounded-lg px-3 py-2 ${permissions.pressing ? 'bg-white/20' : 'bg-black/20'}`}>
+              <div className="text-xs opacity-80">Pressing</div>
+              <div className="font-bold">{permissions.pressing ? 'YES' : 'NO'}</div>
+            </div>
+            <div className={`rounded-lg px-3 py-2 ${permissions.trims ? 'bg-white/20' : 'bg-black/20'}`}>
+              <div className="text-xs opacity-80">Trims</div>
+              <div className="font-bold">{permissions.trims ? 'YES' : 'NO'}</div>
+            </div>
+          </div>
+        </div>
+        {/* QQQE Structure Info */}
+        <div className="mt-3 flex gap-4 text-sm opacity-90">
+          <span>QQQE: <strong>{t.qqqe_structure_position.replace(/_/g, ' ')}</strong></span>
+          <span>Slope: <strong>{t.qqqe_structure_slope}</strong></span>
+          {t.breadth_direction && (
+            <span>Breadth: <strong>{t.breadth_direction.replace('_', ' ')}</strong></span>
+          )}
+        </div>
+      </div>
+
       {/* QQQE Chart - Full Width */}
       <ChartPlaceholder
         title="QQQE — Daily (21EMA Structure Cloud)"
@@ -1096,16 +1236,22 @@ function ViewMarketState({ state }: { state: AgentState }) {
         <QQQEPanel />
       </ChartPlaceholder>
 
-      {/* McClellan Charts - Below */}
+      {/* Breadth Indicators - Below */}
       <div className="mt-4">
         <ChartPlaceholder
-          title="Nasdaq100 — Normalized McClellan (MCSI + MCO)"
-          heightClass={screenshotUrl ? "h-auto" : "h-[520px]"}
-          footerNote={screenshotUrl ? "Data from uploaded screenshot" : "Breadth data from Supabase. Upload screenshot to update."}
+          title="Nasdaq-100 — Breadth Indicators (MCO + MCSI)"
+          heightClass={screenshotUrl ? "h-auto" : "h-auto"}
+          footerNote={t.mco_value !== undefined ? "Calculated from Nasdaq-100 constituent stocks" : "Upload screenshot or run pipeline for live data"}
         >
           <McClellanPanel
             mcoZ={extractedBreadth?.mco_z ?? t.mco_z}
             mcsiZ={extractedBreadth?.mcsi_z ?? t.mcsi_z}
+            mcoValue={t.mco_value}
+            mcsiValue={t.mcsi_value}
+            mcoChange={t.mco_change}
+            breadthDirection={t.breadth_direction}
+            breadthMultiplier={t.breadth_multiplier}
+            breadthDate={t.breadth_date}
             screenshotUrl={screenshotUrl}
             consensus={extractedBreadth?.breadth_consensus}
           />
@@ -1124,6 +1270,25 @@ function ViewMarketState({ state }: { state: AgentState }) {
             <div className="mt-3 text-xs text-zinc-500">
               Upload a screenshot from the Normalized McClellan Analysis tool.
               AI will extract MCSI/MCO z-scores automatically.
+            </div>
+            {/* Clear Screenshot Button - show when screenshot is present */}
+            {screenshotUrl && (
+              <button
+                onClick={clearScreenshot}
+                className="mt-3 w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                Clear Screenshot (Show Calculated Data)
+              </button>
+            )}
+            {/* Show status of calculated vs screenshot data */}
+            <div className="mt-2 text-xs">
+              {screenshotUrl ? (
+                <span className="text-amber-600">Using screenshot data</span>
+              ) : t.mco_value !== undefined ? (
+                <span className="text-emerald-600">Using calculated data from Supabase</span>
+              ) : (
+                <span className="text-zinc-500">No breadth data loaded</span>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1208,20 +1373,23 @@ function ViewLiquidLeaders({ state, onTickerClick }: { state: AgentState; onTick
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[64px]">#</TableHead>
+                <TableHead className="w-[40px]">#</TableHead>
                 <TableHead>Ticker</TableHead>
-                <TableHead>Theme</TableHead>
+                <TableHead className="text-center">Grade</TableHead>
+                <TableHead className="text-center">Mode</TableHead>
+                <TableHead className="text-right">Score</TableHead>
                 <TableHead className="text-right">RS</TableHead>
-                <TableHead className="text-right">ADR%</TableHead>
-                <TableHead className="text-right">Liquidity ($m/day)</TableHead>
                 <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Δ21 (xATR)</TableHead>
-                <TableHead className="text-right">Earnings (d)</TableHead>
+                <TableHead className="text-right">Δ21</TableHead>
+                <TableHead className="text-right">Range%</TableHead>
+                <TableHead className="text-center">Contr</TableHead>
+                <TableHead>Setup</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leaders.slice(0, 15).map((r) => {
-                const earnTone = r.earnings_days <= 7 ? "warn" : "neutral";
+              {leaders.slice(0, 20).map((r) => {
+                const gradeTone = r.grade === 'A' ? 'good' : r.grade === 'B' ? 'neutral' : 'warn';
+                const modeTone = r.mode === 'MODE2' ? 'good' : 'neutral';
                 const distTone = toneForDist21(r.dist_21ema_atr);
                 return (
                   <TableRow key={r.ticker}>
@@ -1233,17 +1401,23 @@ function ViewLiquidLeaders({ state, onTickerClick }: { state: AgentState; onTick
                         <span className="font-semibold text-zinc-900">{r.ticker}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-zinc-700">{r.theme}</TableCell>
-                    <TableCell className="text-right font-medium">{r.rs}</TableCell>
-                    <TableCell className="text-right">{r.adr_pct.toFixed(1)}</TableCell>
-                    <TableCell className="text-right">{r.liquidity_m.toFixed(0)}</TableCell>
-                    <TableCell className="text-right">{r.price.toFixed(1)}</TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={distTone}>{r.dist_21ema_atr.toFixed(1)}</Pill>
+                    <TableCell className="text-center">
+                      <Pill tone={gradeTone}>{r.grade ?? '—'}</Pill>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={earnTone}>{r.earnings_days}</Pill>
+                    <TableCell className="text-center">
+                      <Pill tone={modeTone}>{r.mode === 'MODE2' ? 'M2' : 'M1'}</Pill>
                     </TableCell>
+                    <TableCell className="text-right font-mono font-semibold">{r.score ?? '—'}</TableCell>
+                    <TableCell className="text-right">{r.rs}</TableCell>
+                    <TableCell className="text-right">{r.price?.toFixed(2) ?? '—'}</TableCell>
+                    <TableCell className="text-right">
+                      <Pill tone={distTone}>{r.dist_21ema_atr?.toFixed(2) ?? '—'}</Pill>
+                    </TableCell>
+                    <TableCell className="text-right">{r.close_range_pct?.toFixed(0) ?? '—'}%</TableCell>
+                    <TableCell className="text-center">
+                      {r.is_contracting ? <span className="text-emerald-600">✓</span> : <span className="text-zinc-300">—</span>}
+                    </TableCell>
+                    <TableCell className="text-xs text-zinc-600">{r.setup_type ?? '—'}</TableCell>
                   </TableRow>
                 );
               })}
@@ -1251,8 +1425,8 @@ function ViewLiquidLeaders({ state, onTickerClick }: { state: AgentState; onTick
           </Table>
 
           <div className="mt-3 text-xs text-zinc-500">
-            Contract note: Task 2 only enumerates leaders that pass universe filters.
-            No entry/exit logic is applied here. Showing top 15 of {universe.count}.
+            Sorted by Score (Grade + Distance + Mode + Contraction + RS). Grade A: ≤0.3 ATR + contraction + 60%+ range.
+            M2 = reclaim & backtest. Showing top 20 of {universe.count}.
           </div>
         </div>
       </div>
@@ -1299,29 +1473,26 @@ function ViewPullbackScan({ state, onTickerClick }: { state: AgentState; onTicke
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[64px]">#</TableHead>
+                <TableHead className="w-[40px]">#</TableHead>
                 <TableHead>Ticker</TableHead>
-                <TableHead>Theme</TableHead>
+                <TableHead className="text-center">Grade</TableHead>
+                <TableHead className="text-center">Mode</TableHead>
+                <TableHead className="text-right">Score</TableHead>
                 <TableHead className="text-right">RS</TableHead>
                 <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">ADR%</TableHead>
-                <TableHead className="text-right">Δ21 (xATR)</TableHead>
-                <TableHead className="text-right">Δ50 (xATR)</TableHead>
-                <TableHead className="text-right">Close%</TableHead>
-                <TableHead className="text-right">Contract</TableHead>
-                <TableHead className="text-right">Weekly%</TableHead>
-                <TableHead className="text-right">Earnings (d)</TableHead>
-                <TableHead className="text-right">Ready</TableHead>
+                <TableHead className="text-right">Δ21</TableHead>
+                <TableHead className="text-right">Range%</TableHead>
+                <TableHead className="text-center">Contr</TableHead>
+                <TableHead className="text-right">Earn</TableHead>
+                <TableHead>Setup</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pullbacks.candidates.map((r) => {
+                const gradeTone = r.grade === 'A' ? 'good' : r.grade === 'B' ? 'neutral' : 'warn';
+                const modeTone = r.mode === 'MODE2' ? 'good' : 'neutral';
+                const distTone = toneForDist21(r.dist_21_atr);
                 const earnTone = r.earnings_days <= 7 ? "warn" : "neutral";
-                const dist21Tone = r.dist_21_atr < -0.5 || r.dist_21_atr > 1 ? "warn" : "neutral";
-                const dist50Tone = r.dist_50_atr < 0 || r.dist_50_atr > 3 ? "warn" : "neutral";
-                const closeTone = r.close_pct < 20 ? "warn" : "neutral";
-                const wkTone = r.weekly_return_pct >= 12 ? "warn" : "neutral";
-                const contrTone = r.contraction ? "good" : "warn";
                 return (
                   <TableRow key={r.ticker}>
                     <TableCell className="text-zinc-500">{r.rank}</TableCell>
@@ -1332,31 +1503,26 @@ function ViewPullbackScan({ state, onTickerClick }: { state: AgentState; onTicke
                         <span className="font-semibold text-zinc-900">{r.ticker}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-zinc-700">{r.theme}</TableCell>
-                    <TableCell className="text-right font-medium">{r.rs}</TableCell>
-                    <TableCell className="text-right">{r.price.toFixed(1)}</TableCell>
-                    <TableCell className="text-right">{r.adr_pct.toFixed(1)}</TableCell>
+                    <TableCell className="text-center">
+                      <Pill tone={gradeTone}>{r.grade ?? '—'}</Pill>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Pill tone={modeTone}>{r.mode === 'MODE2' ? 'M2' : 'M1'}</Pill>
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-semibold">{r.score ?? '—'}</TableCell>
+                    <TableCell className="text-right">{r.rs}</TableCell>
+                    <TableCell className="text-right">{r.price.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
-                      <Pill tone={dist21Tone}>{r.dist_21_atr.toFixed(1)}</Pill>
+                      <Pill tone={distTone}>{r.dist_21_atr.toFixed(2)}</Pill>
+                    </TableCell>
+                    <TableCell className="text-right">{r.close_pct.toFixed(0)}%</TableCell>
+                    <TableCell className="text-center">
+                      {r.contraction ? <span className="text-emerald-600">✓</span> : <span className="text-zinc-300">—</span>}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Pill tone={dist50Tone}>{r.dist_50_atr.toFixed(1)}</Pill>
+                      <Pill tone={earnTone}>{r.earnings_days}d</Pill>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={closeTone}>{r.close_pct.toFixed(0)}%</Pill>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={contrTone}>{r.contraction ? 'YES' : 'NO'}</Pill>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={wkTone}>{fmtPct(r.weekly_return_pct)}</Pill>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={earnTone}>{r.earnings_days}</Pill>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={toneForReady(r.ready_grade)}>{r.ready_grade}</Pill>
-                    </TableCell>
+                    <TableCell className="text-xs text-zinc-600">{r.setup_type ?? '—'}</TableCell>
                   </TableRow>
                 );
               })}
@@ -1375,89 +1541,91 @@ function ViewPullbackScan({ state, onTickerClick }: { state: AgentState; onTicke
 
 function ViewFocusList({ state, onTickerClick }: { state: AgentState; onTickerClick?: (ticker: string) => void }) {
   const focusList = state.focusList;
-  const sizing = state.sizing;
   const marketState = state.marketState;
 
-  const candidates = focusList.candidates ?? [];
-
-  const counts = useMemo(() => {
-    const a = candidates.filter((x) => x.reclaim_backtest_grade === "A").length;
-    const b = candidates.filter((x) => x.reclaim_backtest_grade === "B").length;
-    const c = candidates.filter((x) => x.reclaim_backtest_grade === "C").length;
-    return { a, b, c, total: candidates.length };
-  }, [candidates]);
-
-  const totalDollars = sizing.total_planned_dollars ?? 0;
+  // Limit to top 5
+  const candidates = (focusList.candidates ?? []).slice(0, 5);
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4">
       <Card className="rounded-2xl shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Focus List</CardTitle>
+          <CardTitle className="text-sm">Focus List — Top 5 Candidates</CardTitle>
         </CardHeader>
 
         <CardContent>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Pill>Top {focusList.top5.length}</Pill>
-              <Pill tone="good">A: {counts.a}</Pill>
-              <Pill>B: {counts.b}</Pill>
-              <Pill tone={counts.c ? "warn" : "neutral"}>C: {counts.c}</Pill>
-              <Pill>Planned $: {totalDollars.toLocaleString()}</Pill>
+              <Pill>Top {candidates.length}</Pill>
+              <Pill tone={marketState.state === 'CONFIRMED_UPTREND' || marketState.state === 'EARLY_CONFIRMATION' ? 'good' : 'warn'}>
+                Market: {marketState.state.replace(/_/g, ' ')}
+              </Pill>
             </div>
-            <Pill tone={marketState.state === 'CONFIRMED_UPTREND' ? 'good' : 'warn'}>
-              Market: {marketState.state.replace(/_/g, ' ')}
-            </Pill>
           </div>
 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[56px]">#</TableHead>
+                <TableHead className="w-[40px]">#</TableHead>
                 <TableHead>Ticker</TableHead>
-                <TableHead>Setup</TableHead>
-                <TableHead className="text-right">Grade</TableHead>
-                <TableHead className="text-right">Mode</TableHead>
-                <TableHead className="text-right">E(d)</TableHead>
-                <TableHead className="text-right">Δ21 (xATR)</TableHead>
+                <TableHead className="text-center">Grade</TableHead>
+                <TableHead className="text-center">Mode</TableHead>
+                <TableHead className="text-right">Score</TableHead>
+                <TableHead className="text-right">RS</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Δ21</TableHead>
+                <TableHead className="text-right">Range%</TableHead>
+                <TableHead className="text-center">Contr</TableHead>
+                <TableHead className="text-right">Earn</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
-              {candidates.map((c) => (
-                <TableRow key={c.ticker}>
-                  <TableCell className="text-zinc-500">{c.rank}</TableCell>
-                  <TableCell>
-                    <div>
-                      {onTickerClick ? (
-                        <ClickableTicker ticker={c.ticker} onClick={onTickerClick} />
-                      ) : (
-                        <span className="font-semibold text-zinc-900">{c.ticker}</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-zinc-500">{c.theme}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-zinc-800">{c.setup}</div>
-                    <div className="text-xs text-zinc-500">{c.entry_trigger}</div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Pill tone={toneForReady(c.reclaim_backtest_grade)}>{c.reclaim_backtest_grade}</Pill>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Pill tone={c.mode === 'MODE1' ? 'neutral' : 'good'}>{c.mode}</Pill>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Pill tone={toneForEarnings(c.earnings_days)}>{c.earnings_days}</Pill>
-                  </TableCell>
-                  <TableCell className="text-right">{c.dist_to_21ema_atr.toFixed(1)}</TableCell>
-                </TableRow>
-              ))}
+              {candidates.map((c) => {
+                const gradeTone = c.reclaim_backtest_grade === 'A' ? 'good' : c.reclaim_backtest_grade === 'B' ? 'neutral' : 'warn';
+                const modeTone = c.mode === 'MODE2' ? 'good' : 'neutral';
+                const distTone = toneForDist21(c.dist_to_21ema_atr);
+                const earnTone = c.earnings_days <= 7 ? "warn" : "neutral";
+                return (
+                  <TableRow key={c.ticker}>
+                    <TableCell className="text-zinc-500">{c.rank}</TableCell>
+                    <TableCell>
+                      <div>
+                        {onTickerClick ? (
+                          <ClickableTicker ticker={c.ticker} onClick={onTickerClick} />
+                        ) : (
+                          <span className="font-semibold text-zinc-900">{c.ticker}</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-zinc-500">{c.theme}</div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Pill tone={gradeTone}>{c.reclaim_backtest_grade}</Pill>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Pill tone={modeTone}>{c.mode === 'MODE2' ? 'M2' : 'M1'}</Pill>
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-semibold">{c.score?.toFixed(0) ?? '—'}</TableCell>
+                    <TableCell className="text-right">{c.rs ?? '—'}</TableCell>
+                    <TableCell className="text-right">{c.price?.toFixed(2) ?? '—'}</TableCell>
+                    <TableCell className="text-right">
+                      <Pill tone={distTone}>{c.dist_to_21ema_atr.toFixed(2)}</Pill>
+                    </TableCell>
+                    <TableCell className="text-right">{c.close_range_pct?.toFixed(0) ?? '—'}%</TableCell>
+                    <TableCell className="text-center">
+                      {c.is_contracting ? <span className="text-emerald-600">✓</span> : <span className="text-zinc-300">—</span>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Pill tone={earnTone}>{c.earnings_days}d</Pill>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
 
           <div className="mt-3 text-xs text-zinc-500">
-            Contract note: Focus List prepares plans only. Execution occurs in "Suggested Trades".
+            Top 5 candidates sorted by score. Grade A: ≤0.3 ATR + contraction + 60%+ range. M2 = reclaim & backtest.
           </div>
         </CardContent>
       </Card>
@@ -1465,19 +1633,40 @@ function ViewFocusList({ state, onTickerClick }: { state: AgentState; onTickerCl
   );
 }
 
-function ViewSuggestedTrades({ state, onTradeExecuted, onTickerClick }: { state: AgentState; onTradeExecuted?: () => void; onTickerClick?: (ticker: string) => void }) {
+function ViewSuggestedTrades({ state, onTickerClick }: { state: AgentState; onTickerClick?: (ticker: string) => void }) {
   const plan = state.executionPlan;
   const marketState = state.marketState;
   const { passed, withheld, totals } = plan;
+  // Get all sizing candidates, prioritizing PASS over WITHHOLD
+  const rawCandidates = state.sizing?.sizing ?? [];
+  // Sort: PASS candidates first (by score), then WITHHOLD candidates (by score)
+  const allCandidates = useMemo(() => {
+    const passedCandidates = rawCandidates.filter(c => c.gate === 'PASS');
+    const withheldCandidates = rawCandidates.filter(c => c.gate !== 'PASS');
+    // Sort each group by score descending
+    const sortByScore = (a: typeof rawCandidates[0], b: typeof rawCandidates[0]) => (b.score ?? 0) - (a.score ?? 0);
+    passedCandidates.sort(sortByScore);
+    withheldCandidates.sort(sortByScore);
+    // Take up to 5: prioritize PASS, fill with WITHHOLD
+    const result = [...passedCandidates];
+    if (result.length < 5) {
+      result.push(...withheldCandidates.slice(0, 5 - result.length));
+    }
+    return result;
+  }, [rawCandidates]);
 
   // Track executed trades by ticker
   const [executedTrades, setExecutedTrades] = useState<Record<string, 'executing' | 'success' | 'error'>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Ref for immediate click blocking (state updates are async)
+  const executingRef = useRef<Set<string>>(new Set());
 
   const handleExecuteTrade = async (order: typeof passed[0]) => {
-    // Prevent double execution
-    if (executedTrades[order.ticker]) return;
+    // Prevent double execution - use ref for immediate blocking
+    if (executingRef.current.has(order.ticker) || executedTrades[order.ticker]) return;
 
+    // Immediately mark as executing in ref
+    executingRef.current.add(order.ticker);
     setExecutedTrades(prev => ({ ...prev, [order.ticker]: 'executing' }));
     setErrorMessage(null);
 
@@ -1497,10 +1686,7 @@ function ViewSuggestedTrades({ state, onTradeExecuted, onTickerClick }: { state:
       const result = await saveTradeToDatabase(trade);
       if (result) {
         setExecutedTrades(prev => ({ ...prev, [order.ticker]: 'success' }));
-        // Trigger pipeline refresh after short delay
-        if (onTradeExecuted) {
-          setTimeout(onTradeExecuted, 500);
-        }
+        // Trade saved - no pipeline refresh needed
       } else {
         setExecutedTrades(prev => ({ ...prev, [order.ticker]: 'error' }));
         setErrorMessage(`Failed to save ${order.ticker} trade. Check console for details.`);
@@ -1571,76 +1757,95 @@ function ViewSuggestedTrades({ state, onTradeExecuted, onTickerClick }: { state:
           <CardTitle className="text-sm">Order Tickets</CardTitle>
         </CardHeader>
         <CardContent>
-          {passed.length === 0 ? (
-            <div className="text-sm text-zinc-500">No order tickets generated.</div>
+          {allCandidates.length === 0 ? (
+            <div className="text-sm text-zinc-500">No candidates to display.</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Ticker</TableHead>
+                  <TableHead>Gate</TableHead>
+                  <TableHead>Grade</TableHead>
                   <TableHead>Mode</TableHead>
-                  <TableHead className="text-right">Shares</TableHead>
+                  <TableHead className="text-right">Score</TableHead>
+                  <TableHead>Ticker</TableHead>
+                  <TableHead className="text-right">RS</TableHead>
                   <TableHead className="text-right">Entry</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Δ21</TableHead>
+                  <TableHead className="text-right">Range%</TableHead>
+                  <TableHead className="text-center">Contr</TableHead>
+                  <TableHead className="text-right">Shares</TableHead>
                   <TableHead className="text-right">SSL</TableHead>
-                  <TableHead className="text-right">R/Share</TableHead>
-                  <TableHead className="text-right">2R Trim</TableHead>
-                  <TableHead className="text-right">Position $</TableHead>
                   <TableHead className="text-right">NER %</TableHead>
                   <TableHead className="text-center">Record</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {passed.map((order) => {
-                  const btnState = getButtonState(order.ticker);
+                {allCandidates.map((sizing) => {
+                  const isPassed = sizing.gate === 'PASS';
+                  const passedOrder = passed.find(p => p.ticker === sizing.ticker);
+                  const btnState = getButtonState(sizing.ticker);
+                  const gradeTone = sizing.grade === 'A' ? 'good' : sizing.grade === 'B' ? 'neutral' : 'warn';
+                  const modeTone = sizing.mode === 'MODE2' ? 'good' : 'neutral';
+                  const distAtr = sizing.dist_21ema_atr ?? 0;
+                  const distTone = Math.abs(distAtr) <= 0.3 ? 'good' : Math.abs(distAtr) <= 0.7 ? 'neutral' : 'warn';
+                  const gateLabel = isPassed ? 'PASS' : sizing.withhold_reason?.replace(/_/g, ' ') ?? 'WITHHOLD';
                   return (
-                    <TableRow key={order.ticker}>
+                    <TableRow key={sizing.ticker} className={!isPassed ? 'opacity-60' : ''}>
                       <TableCell>
-                        <Pill tone="good">BUY</Pill>
+                        <Pill tone={isPassed ? 'good' : 'warn'}>{gateLabel}</Pill>
+                      </TableCell>
+                      <TableCell>
+                        <Pill tone={gradeTone}>{sizing.grade ?? '—'}</Pill>
+                      </TableCell>
+                      <TableCell>
+                        <Pill tone={modeTone}>{sizing.mode}</Pill>
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-semibold">
+                        {sizing.score?.toFixed(0) ?? '—'}
                       </TableCell>
                       <TableCell className="font-mono">
                         {onTickerClick ? (
-                          <ClickableTicker ticker={order.ticker} onClick={onTickerClick} />
+                          <ClickableTicker ticker={sizing.ticker} onClick={onTickerClick} />
                         ) : (
-                          <span className="font-semibold">{order.ticker}</span>
+                          <span className="font-semibold">{sizing.ticker}</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <Pill tone={order.mode === 'MODE1' ? 'neutral' : 'good'}>
-                          {order.mode}
-                        </Pill>
+                      <TableCell className="text-right font-mono">
+                        {sizing.rs ?? '—'}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {order.entry.shares}
+                        ${sizing.entry.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${order.entry_price.toFixed(2)}
-                      </TableCell>
-                      <TableCell>{order.entry.order_type}</TableCell>
-                      <TableCell className="text-right font-mono text-red-600">
-                        ${order.stop.ssl.toFixed(2)}
+                        <Pill tone={distTone}>{distAtr >= 0 ? '+' : ''}{distAtr.toFixed(2)}</Pill>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${order.r_per_share.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-green-600">
-                        ${order.profit.trim_2r.price.toFixed(2)} ({order.profit.trim_2r.shares})
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {fmtUsd(order.position_dollars)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {order.ec_risk_pct.toFixed(2)}%
+                        {sizing.close_range_pct?.toFixed(0) ?? '—'}%
                       </TableCell>
                       <TableCell className="text-center">
-                        <button
-                          onClick={() => handleExecuteTrade(order)}
-                          disabled={btnState.disabled}
-                          className={`px-3 py-1 text-xs font-medium text-white rounded transition-colors ${btnState.className} disabled:cursor-not-allowed`}
-                        >
-                          {btnState.text}
-                        </button>
+                        {sizing.is_contracting ? '✓' : '—'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {sizing.shares}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-red-600">
+                        ${sizing.ssl.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {sizing.ec_risk_percent.toFixed(2)}%
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {isPassed && passedOrder ? (
+                          <button
+                            onClick={() => handleExecuteTrade(passedOrder)}
+                            disabled={btnState.disabled}
+                            className={`px-3 py-1 text-xs font-medium text-white rounded transition-colors ${btnState.className} disabled:cursor-not-allowed`}
+                          >
+                            {btnState.text}
+                          </button>
+                        ) : (
+                          <span className="text-zinc-400 text-xs">—</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -1757,54 +1962,76 @@ function ViewTradesToday({ state, onTickerClick }: { state: AgentState; onTicker
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[72px]">Time (UTC)</TableHead>
+                <TableHead className="w-[72px]">Time</TableHead>
                 <TableHead>Ticker</TableHead>
                 <TableHead>Side</TableHead>
                 <TableHead>Action</TableHead>
+                <TableHead>Mode</TableHead>
                 <TableHead className="text-right">Shares</TableHead>
                 <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Value</TableHead>
                 <TableHead className="text-right">R</TableHead>
-                <TableHead>Note</TableHead>
+                <TableHead>Notes</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
-              {trades.map((t, i) => (
-                <TableRow key={i}>
-                  <TableCell className="font-mono text-zinc-500">{t.time_utc}</TableCell>
-                  <TableCell>
-                    {onTickerClick ? (
-                      <ClickableTicker ticker={t.ticker} onClick={onTickerClick} />
-                    ) : (
-                      <span className="font-semibold text-zinc-900">{t.ticker}</span>
-                    )}
+              {trades.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center text-zinc-500 py-8">
+                    No trades in the last 24 hours
                   </TableCell>
-                  <TableCell>
-                    <Pill tone={t.action === 'BUY' ? 'good' : 'warn'}>{t.action}</Pill>
-                  </TableCell>
-                  <TableCell>
-                    <Pill tone={
-                      t.action_type === 'ENTRY' ? 'good' :
-                      t.action_type === 'TRIM' ? 'neutral' :
-                      t.action_type === 'EXIT' ? 'warn' : 'neutral'
-                    }>
-                      {t.action_type}
-                    </Pill>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">{t.shares}</TableCell>
-                  <TableCell className="text-right font-mono">${t.price.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    {t.r_multiple !== undefined ? (
-                      <Pill tone={t.r_multiple >= 2 ? 'good' : t.r_multiple < 0 ? 'warn' : 'neutral'}>
-                        {t.r_multiple >= 0 ? '+' : ''}{t.r_multiple.toFixed(1)}R
-                      </Pill>
-                    ) : (
-                      <span className="text-zinc-400">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-zinc-600">{t.notes ?? ""}</TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                trades.map((t, i) => {
+                  const value = t.shares * t.price;
+                  return (
+                    <TableRow key={i}>
+                      <TableCell className="font-mono text-zinc-500">{t.time_utc}</TableCell>
+                      <TableCell>
+                        {onTickerClick ? (
+                          <ClickableTicker ticker={t.ticker} onClick={onTickerClick} />
+                        ) : (
+                          <span className="font-semibold text-zinc-900">{t.ticker}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Pill tone={t.action === 'BUY' ? 'good' : 'warn'}>{t.action}</Pill>
+                      </TableCell>
+                      <TableCell>
+                        <Pill tone={
+                          t.action_type === 'ENTRY' ? 'good' :
+                          t.action_type === 'ADD' ? 'good' :
+                          t.action_type === 'TRIM' ? 'neutral' :
+                          t.action_type === 'EXIT' ? 'warn' : 'neutral'
+                        }>
+                          {t.action_type ?? '—'}
+                        </Pill>
+                      </TableCell>
+                      <TableCell>
+                        {t.mode ? (
+                          <Pill tone={t.mode === 'MODE2' ? 'good' : 'neutral'}>{t.mode}</Pill>
+                        ) : (
+                          <span className="text-zinc-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{t.shares}</TableCell>
+                      <TableCell className="text-right font-mono">${t.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmtUsd(value)}</TableCell>
+                      <TableCell className="text-right">
+                        {t.r_multiple !== undefined ? (
+                          <Pill tone={t.r_multiple >= 2 ? 'good' : t.r_multiple < 0 ? 'warn' : 'neutral'}>
+                            {t.r_multiple >= 0 ? '+' : ''}{t.r_multiple.toFixed(1)}R
+                          </Pill>
+                        ) : (
+                          <span className="text-zinc-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-zinc-600 max-w-[200px] truncate">{t.notes ?? "—"}</TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
 
@@ -1866,77 +2093,96 @@ function ViewPortfolio({ state, onTickerClick }: { state: AgentState; onTickerCl
             <TableHeader>
               <TableRow>
                 <TableHead>Ticker</TableHead>
-                <TableHead>Theme</TableHead>
-                <TableHead className="text-right">Shares</TableHead>
-                <TableHead className="text-right">Avg</TableHead>
-                <TableHead className="text-right">Last</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-                <TableHead className="text-right">Weight</TableHead>
-                <TableHead className="text-right">Open Heat</TableHead>
+                <TableHead>Mode</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">R</TableHead>
+                <TableHead className="text-right">Heat</TableHead>
+                <TableHead className="text-right">Shares</TableHead>
+                <TableHead className="text-right">Entry</TableHead>
+                <TableHead className="text-right">Last</TableHead>
                 <TableHead className="text-right">SSL</TableHead>
+                <TableHead className="text-right">SSL %</TableHead>
                 <TableHead className="text-right">2R</TableHead>
-                <TableHead className="text-right">Trimmed</TableHead>
+                <TableHead className="text-right">Trim</TableHead>
+                <TableHead className="text-right">Weight</TableHead>
+                <TableHead className="text-right">Value</TableHead>
                 <TableHead className="text-right">E(d)</TableHead>
-                <TableHead className="text-right">Status</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
-              {positions.map((p) => {
-                const rMultiple = p.total_r ?? 0;
-                const openHeat = p.open_heat ?? 0;
-                return (
-                  <TableRow key={p.ticker}>
-                    <TableCell>
-                      {onTickerClick ? (
-                        <ClickableTicker ticker={p.ticker} onClick={onTickerClick} />
-                      ) : (
-                        <span className="font-semibold text-zinc-900">{p.ticker}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-zinc-700">{p.theme ?? '-'}</TableCell>
-                    <TableCell className="text-right">{p.shares}</TableCell>
-                    <TableCell className="text-right">{(p.avg_price ?? p.entry).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{(p.last_price ?? 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{fmtUsd(p.value ?? 0)}</TableCell>
-                    <TableCell className="text-right">{p.weight.toFixed(1)}%</TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={toneForPnl(openHeat)}>
-                        {openHeat >= 0 ? '+' : ''}{openHeat.toFixed(2)}%
-                      </Pill>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={rMultiple >= 2 ? "good" : rMultiple < 0 ? "warn" : "neutral"}>
-                        {rMultiple >= 0 ? '+' : ''}{rMultiple.toFixed(1)}R
-                      </Pill>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-red-600">
-                      {p.ssl.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-green-600">
-                      {(p.trim_2r_price ?? 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {p.trimmed > 0 ? (
-                        <Pill tone="good">{p.trimmed.toFixed(0)}%</Pill>
-                      ) : (
-                        <span className="text-zinc-400">0%</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={toneForEarnings(p.earnings_days ?? 999)}>
-                        {p.earnings_days ?? '-'}
-                      </Pill>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Pill tone={p.status === 'RUNNER' ? 'good' : p.status === 'STARTER' ? 'neutral' : 'neutral'}>
-                        {p.status}
-                      </Pill>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {positions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={15} className="text-center text-zinc-500 py-8">
+                    No open positions
+                  </TableCell>
+                </TableRow>
+              ) : (
+                positions.map((p) => {
+                  const rMultiple = p.total_r ?? 0;
+                  const openHeat = p.open_heat ?? 0;
+                  const lastPrice = p.last_price ?? p.entry;
+                  const sslDistPct = ((lastPrice - p.ssl) / lastPrice) * 100;
+                  const trim2r = p.trim_2r_price ?? 0;
+                  const canTrim = rMultiple >= 2 && p.trimmed < 33;
+                  return (
+                    <TableRow key={p.ticker}>
+                      <TableCell>
+                        {onTickerClick ? (
+                          <ClickableTicker ticker={p.ticker} onClick={onTickerClick} />
+                        ) : (
+                          <span className="font-semibold text-zinc-900">{p.ticker}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Pill tone={p.mode === 'MODE2' ? 'good' : 'neutral'}>
+                          {p.mode ?? 'M1'}
+                        </Pill>
+                      </TableCell>
+                      <TableCell>
+                        <Pill tone={p.status === 'RUNNER' ? 'good' : p.status === 'CORE' ? 'neutral' : 'neutral'}>
+                          {p.status ?? 'STARTER'}
+                        </Pill>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Pill tone={rMultiple >= 2 ? "good" : rMultiple < 0 ? "warn" : "neutral"}>
+                          {rMultiple >= 0 ? '+' : ''}{rMultiple.toFixed(1)}R
+                        </Pill>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Pill tone={toneForPnl(openHeat)}>
+                          {openHeat >= 0 ? '+' : ''}{openHeat.toFixed(1)}%
+                        </Pill>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{p.shares}</TableCell>
+                      <TableCell className="text-right font-mono">${(p.avg_price ?? p.entry).toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono">${lastPrice.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono text-red-600">${p.ssl.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        <Pill tone={sslDistPct < 3 ? 'warn' : sslDistPct < 5 ? 'neutral' : 'good'}>
+                          {sslDistPct.toFixed(1)}%
+                        </Pill>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-green-600">${trim2r.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        {p.trimmed > 0 ? (
+                          <Pill tone="good">{p.trimmed.toFixed(0)}%</Pill>
+                        ) : canTrim ? (
+                          <Pill tone="good">Ready</Pill>
+                        ) : (
+                          <span className="text-zinc-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{p.weight.toFixed(1)}%</TableCell>
+                      <TableCell className="text-right font-mono">{fmtUsd(p.value ?? 0)}</TableCell>
+                      <TableCell className="text-right">
+                        <Pill tone={toneForEarnings(p.earnings_days ?? 999)}>
+                          {p.earnings_days ?? '—'}
+                        </Pill>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }))}
             </TableBody>
           </Table>
 
@@ -2074,7 +2320,7 @@ export default function TradingAgentDashboard() {
           {active === "Liquid Leaders" && <ViewLiquidLeaders state={agentState} onTickerClick={handleTickerClick} />}
           {active === "Pullback Scan" && <ViewPullbackScan state={agentState} onTickerClick={handleTickerClick} />}
           {active === "Focus List" && <ViewFocusList state={agentState} onTickerClick={handleTickerClick} />}
-          {active === "Suggested Trades" && <ViewSuggestedTrades state={agentState} onTradeExecuted={handleEodRefresh} onTickerClick={handleTickerClick} />}
+          {active === "Suggested Trades" && <ViewSuggestedTrades state={agentState} onTickerClick={handleTickerClick} />}
           {active === "Trades Today" && <ViewTradesToday state={agentState} onTickerClick={handleTickerClick} />}
           {active === "Portfolio" && <ViewPortfolio state={agentState} onTickerClick={handleTickerClick} />}
         </>

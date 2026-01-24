@@ -58,6 +58,21 @@ export interface PullbackCandidate {
   earnings_days: number;
   /** Preliminary readiness grade */
   ready_grade: ReadinessGrade;
+
+  // === Backtest-Style Scoring Fields ===
+
+  /** Setup grade: A (perfect), B (good), C (acceptable) */
+  grade?: 'A' | 'B' | 'C';
+  /** Entry mode: MODE1 (weakness into structure), MODE2 (reclaim & backtest) */
+  mode?: 'MODE1' | 'MODE2';
+  /** Setup type description */
+  setup_type?: string;
+  /** Total score based on backtest weights */
+  score?: number;
+  /** 21EMA of closes */
+  ema21_close?: number;
+  /** Whether structure is intact (close >= ema21_low) */
+  structure_intact?: boolean;
 }
 
 /**

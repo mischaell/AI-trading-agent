@@ -107,6 +107,12 @@ import {
   TradeInsert,
 } from '@/lib/supabase';
 
+import {
+  getBreadthData,
+  getBreadthHistory,
+  type BreadthData as SupabaseBreadthData,
+} from '@/lib/market-data';
+
 // =============================================================================
 // Exported Types
 // =============================================================================
@@ -321,6 +327,171 @@ const PULLBACK_CRITERIA = {
   max_dist_50_atr: 3.0,
   max_weekly_return_pct: 12,
 };
+
+// =============================================================================
+// Breadth Calculation (Nasdaq-100 MCO/MCSI)
+// =============================================================================
+
+interface CalculatedBreadth {
+  mco: number;
+  mcsi: number;
+  mcoZscore: number;
+  mcsiZscore: number;
+  mcoChange: number;
+  mcsiChange: number;
+  advances: number;
+  declines: number;
+}
+
+/**
+ * Calculate Nasdaq-100 breadth indicators from OHLC data
+ * MCO = 19-day EMA(Net Advances) - 39-day EMA(Net Advances)
+ * MCSI = Cumulative sum of MCO
+ */
+async function calculateNasdaq100BreadthFromOHLC(
+  tickers: string[],
+  lookbackDays: number = 252
+): Promise<{ today: CalculatedBreadth | null; yesterday: CalculatedBreadth | null }> {
+  console.log('[Pipeline] Calculating Nasdaq-100 breadth...');
+
+  try {
+    // Fetch OHLC data for all tickers
+    const ohlcData = new Map<string, OHLCBar[]>();
+
+    // Fetch in batches of 10 to avoid rate limiting
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
+      const batch = tickers.slice(i, i + BATCH_SIZE);
+      const batchPromises = batch.map(async (ticker) => {
+        const bars = await fetchOHLCData(ticker, lookbackDays);
+        return { ticker, bars };
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      for (const { ticker, bars } of batchResults) {
+        if (bars.length > 0) {
+          ohlcData.set(ticker, bars);
+        }
+      }
+
+      // Small delay between batches
+      if (i + BATCH_SIZE < tickers.length) {
+        await delay(200);
+      }
+    }
+
+    // Get all unique dates across all tickers
+    const allDates = new Set<string>();
+    const ohlcValues = Array.from(ohlcData.values());
+    for (const bars of ohlcValues) {
+      for (const bar of bars) {
+        allDates.add(bar.date);
+      }
+    }
+
+    const sortedDates = Array.from(allDates).sort();
+    if (sortedDates.length < 40) {
+      console.log('[Pipeline] Insufficient data for breadth calculation');
+      return { today: null, yesterday: null };
+    }
+
+    // Calculate daily advances/declines
+    const dailyData: Array<{ date: string; advances: number; declines: number; netAdv: number }> = [];
+
+    for (let i = 1; i < sortedDates.length; i++) {
+      const date = sortedDates[i];
+      const prevDate = sortedDates[i - 1];
+
+      let advances = 0;
+      let declines = 0;
+
+      const ohlcEntries = Array.from(ohlcData.entries());
+      for (const [_ticker, bars] of ohlcEntries) {
+        const todayBar = bars.find((b: OHLCBar) => b.date === date);
+        const prevBar = bars.find((b: OHLCBar) => b.date === prevDate);
+
+        if (todayBar && prevBar) {
+          const todayClose = toNumber(todayBar.close);
+          const prevClose = toNumber(prevBar.close);
+          if (todayClose > prevClose) advances++;
+          else if (todayClose < prevClose) declines++;
+        }
+      }
+
+      dailyData.push({ date, advances, declines, netAdv: advances - declines });
+    }
+
+    // Calculate EMAs for MCO
+    const netAdvances = dailyData.map(d => d.netAdv);
+    const ema19 = calculateEMA(netAdvances, 19);
+    const ema39 = calculateEMA(netAdvances, 39);
+
+    // Calculate MCO and MCSI
+    const mcoValues: number[] = [];
+    const mcsiValues: number[] = [];
+    let cumMcsi = 0;
+
+    for (let i = 0; i < dailyData.length; i++) {
+      if (i >= 38) { // Need at least 39 days for both EMAs
+        const mco = ema19[i] - ema39[i];
+        cumMcsi += mco;
+        mcoValues.push(mco);
+        mcsiValues.push(cumMcsi);
+      }
+    }
+
+    // Calculate z-scores (rolling 252-day window)
+    const calcZscore = (values: number[], idx: number, window: number = 252): number => {
+      const start = Math.max(0, idx - window + 1);
+      const slice = values.slice(start, idx + 1);
+      if (slice.length < 20) return 0;
+
+      const mean = slice.reduce((a: number, b: number) => a + b, 0) / slice.length;
+      const variance = slice.reduce((a: number, b: number) => a + (b - mean) ** 2, 0) / slice.length;
+      const stdev = Math.sqrt(variance);
+      return stdev > 0 ? (values[idx] - mean) / stdev : 0;
+    };
+
+    const lastIdx = mcoValues.length - 1;
+    const prevIdx = mcoValues.length - 2;
+
+    if (lastIdx < 1) {
+      return { today: null, yesterday: null };
+    }
+
+    const todayAdv = dailyData[dailyData.length - 1]?.advances ?? 0;
+    const todayDec = dailyData[dailyData.length - 1]?.declines ?? 0;
+
+    const today: CalculatedBreadth = {
+      mco: mcoValues[lastIdx],
+      mcsi: mcsiValues[lastIdx],
+      mcoZscore: calcZscore(mcoValues, lastIdx),
+      mcsiZscore: calcZscore(mcsiValues, lastIdx),
+      mcoChange: mcoValues[lastIdx] - mcoValues[prevIdx],
+      mcsiChange: mcsiValues[lastIdx] - mcsiValues[prevIdx],
+      advances: todayAdv,
+      declines: todayDec,
+    };
+
+    const yesterday: CalculatedBreadth | null = prevIdx >= 0 ? {
+      mco: mcoValues[prevIdx],
+      mcsi: mcsiValues[prevIdx],
+      mcoZscore: calcZscore(mcoValues, prevIdx),
+      mcsiZscore: calcZscore(mcsiValues, prevIdx),
+      mcoChange: prevIdx > 0 ? mcoValues[prevIdx] - mcoValues[prevIdx - 1] : 0,
+      mcsiChange: prevIdx > 0 ? mcsiValues[prevIdx] - mcsiValues[prevIdx - 1] : 0,
+      advances: 0,
+      declines: 0,
+    } : null;
+
+    console.log(`[Pipeline] Breadth calculated: MCO=${today.mco.toFixed(2)}, MCSI=${today.mcsi.toFixed(2)}, MCO Change=${today.mcoChange.toFixed(2)}`);
+
+    return { today, yesterday };
+  } catch (error) {
+    console.error('[Pipeline] Breadth calculation failed:', error);
+    return { today: null, yesterday: null };
+  }
+}
 
 // =============================================================================
 // Real Data Fetching Functions
@@ -752,6 +923,9 @@ function convertPositionRowToRawPosition(row: PositionRow): RawPosition {
     earnings_days: undefined, // Would come from market data
     dist_21_atr: undefined, // Would come from market data
     theme: row.theme ?? undefined,
+    mode: row.mode,
+    status: row.status,
+    trimmed_pct: row.trimmed_pct,
   };
 }
 
@@ -912,20 +1086,84 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Task 1: Market Analysis (always fresh - real QQQE from Yahoo)
+    // Task 1: Market Analysis (always fresh - real QQQE + calculated breadth)
     // ─────────────────────────────────────────────────────────────────────────
     await notify('Task 1', 'starting', 0, 'Fetching QQQE market data...');
 
     const qqqeBars = await fetchOHLCData('QQQE', 35);
+
+    // Get breadth data from Supabase
+    await notify('Task 1', 'running', 3, 'Fetching breadth data...');
+
+    // Check if breadth data needs refresh
+    let supabaseBreadth = await getBreadthData();
+    const isBreadthStale = supabaseBreadth.date < today;
+
+    // If stale and force refresh requested, calculate fresh breadth data
+    if (isBreadthStale && forceRefresh) {
+      await notify('Task 1', 'running', 5, 'Calculating fresh breadth data (this takes ~30s)...');
+      console.log('[Pipeline] Breadth data stale, triggering update...');
+
+      try {
+        const updateResponse = await fetch(`${BASE_URL}/api/breadth-update`, {
+          method: 'POST',
+        });
+        const updateResult = await updateResponse.json();
+
+        if (updateResult.success && !updateResult.skipped) {
+          console.log(`[Pipeline] Breadth updated: ${updateResult.latest?.date}`);
+          // Re-fetch the updated data
+          supabaseBreadth = await getBreadthData();
+        }
+      } catch (error) {
+        console.error('[Pipeline] Breadth update failed:', error);
+      }
+    }
+
+    // Get yesterday's data for direction calculation
+    const breadthHistory = await getBreadthHistory(2);
+    const yesterdayBreadth = breadthHistory.length > 1 ? breadthHistory[1] : null;
+
+    console.log('[Pipeline] Breadth data:', JSON.stringify({
+      date: supabaseBreadth.date,
+      mco: supabaseBreadth.mco,
+      mcsi: supabaseBreadth.mcsi,
+      mco_z: supabaseBreadth.mco_z,
+      yesterday_mco: yesterdayBreadth?.mco,
+    }));
+
+    // Build breadth data for market analysis
     const breadthData: BreadthData = {
-      mco_z: 0.5,
-      mcsi_z: 0.8,
-      mcsi_10dma: 0.7,
-      mcsi_z_prev: 0.75,
+      mco_z: supabaseBreadth.mco_z ?? 0,
+      mcsi_z: supabaseBreadth.mcsi_z ?? 0,
+      mcsi_10dma: supabaseBreadth.mcsi_z ?? 0,
+      mcsi_z_prev: yesterdayBreadth?.mcsi_z ?? supabaseBreadth.mcsi_z ?? 0,
+      // Raw values for direction calculation
+      mco_value: supabaseBreadth.mco,
+      mco_value_prev: yesterdayBreadth?.mco,
+      mcsi_value: supabaseBreadth.mcsi,
+      mcsi_value_prev: yesterdayBreadth?.mcsi,
     };
 
     const marketState = analyzeMarketState(qqqeBars, breadthData);
-    await notify('Task 1', 'complete', 10, `Market: ${marketState.state}`);
+    marketState.breadth_date = supabaseBreadth.date;
+
+    // Log stale data warning
+    if (supabaseBreadth.date < today) {
+      const breadthDateObj = new Date(supabaseBreadth.date);
+      const todayDateObj = new Date(today);
+      const daysDiff = Math.floor((todayDateObj.getTime() - breadthDateObj.getTime()) / (1000 * 60 * 60 * 24));
+      console.warn(`[Pipeline] Breadth data is ${daysDiff} day(s) old (from ${supabaseBreadth.date})`);
+    }
+
+    console.log('[Pipeline] Market state:', JSON.stringify({
+      state: marketState.state,
+      mco_value: marketState.mco_value,
+      breadth_direction: marketState.breadth_direction,
+      breadth_date: marketState.breadth_date,
+    }));
+    const breadthDir = marketState.breadth_direction ?? 'FLAT';
+    await notify('Task 1', 'complete', 10, `Market: ${marketState.state} | Breadth: ${breadthDir}`);
 
     // >>> PERSIST: Save market snapshot to Supabase (non-blocking)
     saveMarketSnapshot(marketState, today).catch(e => console.error('[Pipeline] Snapshot save error:', e));
@@ -1081,6 +1319,67 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     const pullbacks = scanPullbackCandidates(pullbackCandidates);
     await notify('Task 3', 'complete', 50, `Found ${pullbacks.count} pullback candidates`);
 
+    // Enrich universe leaders with calculated structure data + backtest-style scoring
+    if (universe.leaders) {
+      for (const leader of universe.leaders) {
+        const structure = structureData.get(leader.ticker);
+        const univItem = universeItemData.get(leader.ticker);
+        if (structure) {
+          leader.price = structure.close;
+          leader.dist_21ema_atr = structure.dist_21ema_atr;
+          leader.ema21_close = structure.ema21_close;
+          leader.ema21_low = structure.ema21_low;
+          leader.ema50_close = structure.ema50_close;
+          leader.atr14 = structure.atr14;
+          leader.dist_50ema_atr = structure.dist_50ema_atr;
+          leader.structure_position = structure.structure_position;
+          leader.structure_intact = structure.structure_intact;
+          leader.weekly_return_pct = structure.weekly_return_pct;
+          leader.close_range_pct = structure.close_range_pct;
+          leader.is_contracting = structure.is_contracting;
+
+          // Calculate Grade (A/B/C) based on backtest logic
+          const distAbs = Math.abs(structure.dist_21ema_atr);
+          if (distAbs <= 0.3 && structure.is_contracting && structure.close_range_pct >= 60 && structure.structure_intact) {
+            leader.grade = 'A';
+          } else if (distAbs <= 0.7 && structure.close_range_pct >= 40 && structure.structure_intact) {
+            leader.grade = 'B';
+          } else {
+            leader.grade = 'C';
+          }
+
+          // Calculate Mode (MODE1/MODE2) based on backtest logic
+          const priceAboveStructure = structure.close > structure.ema21_close;
+          if (priceAboveStructure && structure.dist_21ema_atr >= 0 && structure.dist_21ema_atr <= 0.5) {
+            leader.mode = 'MODE2'; // Reclaim & backtest
+          } else {
+            leader.mode = 'MODE1'; // Weakness into structure
+          }
+
+          // Setup type description
+          leader.setup_type = leader.mode === 'MODE2' ? 'reclaim & backtest' : 'weakness into structure';
+          if (structure.is_contracting) leader.setup_type += ' + contraction';
+
+          // Calculate Score using backtest weights
+          const gradeScore = leader.grade === 'A' ? 30 : leader.grade === 'B' ? 20 : 10;
+          const distScore = distAbs <= 0.5 ? 25 : distAbs <= 1.0 ? 15 : 5;
+          const modeScore = leader.mode === 'MODE2' ? 15 : 10;
+          const contractionScore = structure.is_contracting ? 10 : 0;
+          const rsScore = leader.rs >= 90 ? 10 : leader.rs >= 80 ? 7 : 4;
+          leader.score = gradeScore + distScore + modeScore + contractionScore + rsScore;
+        }
+        if (univItem) {
+          leader.adr_pct = univItem.adrPct;
+          leader.liquidity_m = univItem.liquidityM;
+        }
+      }
+
+      // Sort leaders by score (highest first)
+      universe.leaders.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+      // Re-assign ranks after sorting
+      universe.leaders.forEach((leader, idx) => { leader.rank = idx + 1; });
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Task 4: Entry Readiness (cached 1 hour)
     // ─────────────────────────────────────────────────────────────────────────
@@ -1138,8 +1437,8 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     // ─────────────────────────────────────────────────────────────────────────
     await notify('Task 5', 'starting', 65, 'Ranking focus list...');
 
-    const readyRows = readiness.rows.filter(r => r.ready);
-    const focusInput: FocusListTickerData[] = readyRows.map((r, i) => {
+    // Use all pullback candidates for focus list ranking (not just ready ones)
+    const focusInput: FocusListTickerData[] = readiness.rows.map((r, i) => {
       const structure = structureData.get(r.ticker);
       const rsItem = rsData.get(r.ticker);
 
@@ -1167,6 +1466,7 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
           structure?.is_contracting ?? false,
           structure?.weekly_return_pct ?? 5
         ),
+        price: structure?.close ?? 0,
       };
     });
 
@@ -1197,6 +1497,11 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
         price: structure?.close ?? 100,
         ema21_low: structure?.ema21_low ?? 98,
         atr: structure?.atr14 ?? 2,
+        // Backtest-style scoring fields from focus list
+        score: c.score,
+        rs: c.rs,
+        close_range_pct: c.close_range_pct,
+        is_contracting: c.is_contracting,
       };
     });
 
@@ -1207,7 +1512,11 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       pressing: false,
       trims: true,
     };
-    const marketContext: MarketContext = { permissions: marketState.permissions ?? defaultPermissions };
+    // Pass full market state for multiplier calculation
+    const marketContext: MarketContext = {
+      permissions: marketState.permissions ?? defaultPermissions,
+      marketState: marketState,  // NEW: Pass market state for breadth multiplier
+    };
     const sizing = calculatePositionSizing(sizingInput, portfolioContext, marketContext);
 
     const passCount = sizing.sizing.filter(r => r.gate === 'PASS').length;

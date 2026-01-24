@@ -30,6 +30,7 @@ import {
   aggregateDailyStates,
   type AlexState,
   type DailyState,
+  type BreadthSignal,
 } from "./alex-states";
 
 // =============================================================================
@@ -86,6 +87,13 @@ interface AlexStateContext {
   positionSizeMultiplier: number;  // Adjust position sizes based on state
   allowNewEntries: boolean;
   allowAdds: boolean;
+  // Breadth indicators
+  breadth: {
+    mcsi: "UP" | "DOWN" | "NEUTRAL";
+    mco: "UP" | "DOWN" | "OVERBOUGHT" | "OVERSOLD" | "NEUTRAL";
+    breadthExt: "UP" | "DOWN" | "NEUTRAL";
+    overall: "BULLISH" | "BEARISH" | "MIXED" | "NEUTRAL";
+  };
 }
 
 const STATE_RECOMMENDATIONS: Record<AlexState, {
@@ -138,6 +146,13 @@ function getAlexStateForDate(date: string): AlexStateContext {
     "data/discord-exports/alex-journal.json"
   );
 
+  const defaultBreadth = {
+    mcsi: "NEUTRAL" as const,
+    mco: "NEUTRAL" as const,
+    breadthExt: "NEUTRAL" as const,
+    overall: "NEUTRAL" as const,
+  };
+
   // Default to NEUTRAL if no journal data
   if (!fs.existsSync(journalPath)) {
     return {
@@ -147,7 +162,8 @@ function getAlexStateForDate(date: string): AlexStateContext {
       recommendation: STATE_RECOMMENDATIONS.NEUTRAL.recommendation,
       positionSizeMultiplier: 1.0,
       allowNewEntries: true,
-      allowAdds: true
+      allowAdds: true,
+      breadth: defaultBreadth
     };
   }
 
@@ -163,7 +179,8 @@ function getAlexStateForDate(date: string): AlexStateContext {
       recommendation: STATE_RECOMMENDATIONS.NEUTRAL.recommendation,
       positionSizeMultiplier: 1.0,
       allowNewEntries: true,
-      allowAdds: true
+      allowAdds: true,
+      breadth: defaultBreadth
     };
   }
 
@@ -181,14 +198,31 @@ function getAlexStateForDate(date: string): AlexStateContext {
     daily.summary.sellingScore
   );
 
+  // Get breadth summary
+  const b = daily.breadthSummary;
+
+  // Adjust position multiplier based on breadth
+  let positionMultiplier = stateConfig.positionMultiplier;
+  if (b.overallBreadth === "BULLISH") {
+    positionMultiplier = Math.min(1.2, positionMultiplier * 1.1); // +10% boost for bullish breadth
+  } else if (b.overallBreadth === "BEARISH") {
+    positionMultiplier = positionMultiplier * 0.8; // -20% reduction for bearish breadth
+  }
+
   return {
     state: daily.primaryState,
     confidence: Math.min(1, maxScore),
     topSignal,
     recommendation: stateConfig.recommendation,
-    positionSizeMultiplier: stateConfig.positionMultiplier,
+    positionSizeMultiplier: positionMultiplier,
     allowNewEntries: stateConfig.allowEntries,
-    allowAdds: stateConfig.allowAdds
+    allowAdds: stateConfig.allowAdds,
+    breadth: {
+      mcsi: b.mcsiDirection,
+      mco: b.mcoDirection,
+      breadthExt: b.breadthExtDirection,
+      overall: b.overallBreadth
+    }
   };
 }
 
@@ -497,6 +531,20 @@ function formatIdeas(
     }[alexState.state] || "➖";
 
     lines.push("│" + `  Alex State: ${stateIcon} ${alexState.state}`.padEnd(width - 2) + "│");
+
+    // Breadth Indicators
+    const mcsiIcon = alexState.breadth.mcsi === "UP" ? "↑" : alexState.breadth.mcsi === "DOWN" ? "↓" : "─";
+    const mcoIcon = alexState.breadth.mco === "UP" ? "↑" :
+                    alexState.breadth.mco === "DOWN" ? "↓" :
+                    alexState.breadth.mco === "OVERBOUGHT" ? "OB" :
+                    alexState.breadth.mco === "OVERSOLD" ? "OS" : "─";
+    const breadthIcon = alexState.breadth.breadthExt === "UP" ? "↑" : alexState.breadth.breadthExt === "DOWN" ? "↓" : "─";
+    const overallIcon = alexState.breadth.overall === "BULLISH" ? "🟢" :
+                        alexState.breadth.overall === "BEARISH" ? "🔴" :
+                        alexState.breadth.overall === "MIXED" ? "🟡" : "⚪";
+
+    const breadthLine = `  Breadth: MCSI ${mcsiIcon} | MCO ${mcoIcon} | Ext ${breadthIcon} | Overall: ${overallIcon} ${alexState.breadth.overall}`;
+    lines.push("│" + breadthLine.padEnd(width - 2) + "│");
     lines.push("│" + `  ${alexState.recommendation}`.padEnd(width - 2) + "│");
 
     // Show permissions based on Alex state
@@ -658,6 +706,7 @@ async function main() {
     console.log(`[DailyIdeas] Loading Alex state for ${date}...`);
     const alexState = getAlexStateForDate(date);
     console.log(`[DailyIdeas] Alex State: ${alexState.state}`);
+    console.log(`[DailyIdeas] Breadth: MCSI=${alexState.breadth.mcsi} MCO=${alexState.breadth.mco} Overall=${alexState.breadth.overall}`);
 
     // Adjust filter based on Alex state
     const filter: FilterConfig = {

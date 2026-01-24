@@ -24,8 +24,10 @@ import {
   GateResult,
   WithholdReason,
   EntryMode,
+  SizingMultipliers,
+  SizingActionType,
 } from '@/types';
-import { MarketPermissions, NewEntriesPermission } from '@/types/market-state';
+import { MarketPermissions, NewEntriesPermission, BreadthDirection, MarketStateOutput } from '@/types/market-state';
 import { FocusListCandidate } from '@/types/focus-list';
 
 // =============================================================================
@@ -68,6 +70,10 @@ export interface PortfolioContext {
 export interface MarketContext {
   /** Current market permissions */
   permissions: MarketPermissions;
+  /** Full market state output (optional, for multiplier calculation) */
+  marketState?: MarketStateOutput;
+  /** Behavioral state from Alex journal (optional: TESTING/PRESSING/TRIMMING/DEFENSIVE/SELLING) */
+  alexState?: string;
 }
 
 /**
@@ -88,6 +94,19 @@ export interface SizingConfig {
   reduce_size_for_limited?: boolean;
   /** Size reduction factor for LIMITED (default: 0.5) */
   limited_size_factor?: number;
+
+  // === NEW: Multiplier-based sizing options ===
+
+  /** Use multiplier-based sizing (default: false for backwards compatibility) */
+  use_multiplier_sizing?: boolean;
+  /** Base NER for multiplier sizing (default: 1.5%) */
+  base_ner_pct?: number;
+  /** Portfolio equity (default: 100000) */
+  portfolio_equity?: number;
+  /** Min position size in dollars (default: 5000) */
+  min_position_dollars?: number;
+  /** Max position size in dollars (default: 20000) */
+  max_position_dollars?: number;
 }
 
 /**
@@ -131,7 +150,86 @@ export const DEFAULT_SIZING_CONFIG: Required<SizingConfig> = {
   min_earnings_days: 7,
   reduce_size_for_limited: true,
   limited_size_factor: 0.5,
+  // NEW: Multiplier-based sizing defaults
+  use_multiplier_sizing: false,
+  base_ner_pct: 1.5,
+  portfolio_equity: 100000,
+  min_position_dollars: 5000,
+  max_position_dollars: 20000,
 };
+
+// =============================================================================
+// Sizing Multipliers (NEW)
+// =============================================================================
+
+/**
+ * State multipliers based on Alex's behavioral state
+ */
+const STATE_MULTIPLIERS: Record<string, number> = {
+  TESTING: 0.5,
+  PRESSING: 1.2,
+  TRIMMING: 0.7,
+  DEFENSIVE: 0.5,
+  SELLING: 0,
+  NEUTRAL: 1.0,
+};
+
+/**
+ * Calculate sizing multipliers based on market state and Alex state
+ */
+export function calculateSizingMultipliers(
+  marketState?: MarketStateOutput,
+  alexState?: string
+): SizingMultipliers {
+  // State multiplier from Alex journal (or default NEUTRAL)
+  const stateLabel = alexState?.toUpperCase() || 'NEUTRAL';
+  const stateMultiplier = STATE_MULTIPLIERS[stateLabel] ?? 1.0;
+
+  // Breadth multiplier from market state
+  const breadthMultiplier = marketState?.breadth_multiplier ?? 1.0;
+  const breadthDirection = marketState?.breadth_direction;
+
+  // QQQE structure multiplier
+  let qqqeMultiplier = 1.0;
+  let qqqePosition = 'inside';
+  if (marketState?.qqqe_structure_position === 'above_cloud') {
+    qqqeMultiplier = 1.1;
+    qqqePosition = 'above';
+  } else if (marketState?.qqqe_structure_position === 'below_cloud') {
+    qqqeMultiplier = 0.5;
+    qqqePosition = 'below';
+  }
+
+  // Combined multiplier (capped 0.3-1.3)
+  const raw = stateMultiplier * breadthMultiplier * qqqeMultiplier;
+  const combined = Math.min(1.3, Math.max(0.3, raw));
+
+  return {
+    state: stateMultiplier,
+    state_label: stateLabel,
+    breadth: breadthMultiplier,
+    breadth_direction: breadthDirection,
+    qqqe: qqqeMultiplier,
+    qqqe_position: qqqePosition,
+    combined,
+  };
+}
+
+/**
+ * Format trade in Discord equity-trades format
+ */
+export function formatDiscordTrade(
+  ticker: string,
+  positionPct: number,
+  entry: number,
+  ssl: number,
+  ecRiskPct: number,
+  trim2rPrice: number,
+  actionType: SizingActionType = 'NEW_ENTRY'
+): string {
+  const action = actionType === 'ADD' ? 'ADD' : 'Long';
+  return `${action} ${Math.round(positionPct)}% ${ticker} @ ${entry.toFixed(2)}`;
+}
 
 /**
  * Default portfolio limits
@@ -325,22 +423,46 @@ function evaluateGate(
  */
 function toSizingOutput(
   sizing: SizingCalculation,
-  gate: GateEvaluation
+  gate: GateEvaluation,
+  candidate: SizingTickerData,
+  multipliers?: SizingMultipliers,
+  actionType?: SizingActionType
 ): SizingOutput {
+  const positionPct = sizing.position_percent.toNumber();
+  const entry = sizing.entry.toNumber();
+  const ssl = sizing.ssl.toNumber();
+  const ecRiskPct = sizing.ec_risk_percent.toNumber();
+  const trim2rPrice = sizing.trim_2r_price.toNumber();
+  const action = actionType || 'NEW_ENTRY';
+
   return {
     task: 'sizing',
     ticker: sizing.ticker,
     mode: sizing.mode,
-    position_percent: sizing.position_percent.toNumber(),
+    position_percent: positionPct,
     position_dollars: sizing.position_dollars.toNumber(),
-    entry: sizing.entry.toNumber(),
-    ssl: sizing.ssl.toNumber(),
+    entry,
+    ssl,
     shares: sizing.shares,
     r_per_share: sizing.r_per_share.toNumber(),
-    trim_2r_price: sizing.trim_2r_price.toNumber(),
-    ec_risk_percent: sizing.ec_risk_percent.toNumber(),
+    trim_2r_price: trim2rPrice,
+    ec_risk_percent: ecRiskPct,
     gate: gate.gate,
     withhold_reason: gate.reason,
+    // NEW: Multiplier and discord format fields
+    multipliers,
+    action_type: action,
+    discord_format: formatDiscordTrade(sizing.ticker, positionPct, entry, ssl, ecRiskPct, trim2rPrice, action),
+    trim_fraction: '1/3',
+    trim_target_r: 2,
+    // Backtest-style scoring fields from candidate
+    grade: candidate.reclaim_backtest_grade as 'A' | 'B' | 'C' | undefined,
+    score: candidate.score,
+    rs: candidate.rs,
+    dist_21ema_atr: candidate.dist_to_21ema_atr,
+    close_range_pct: candidate.close_range_pct,
+    is_contracting: candidate.is_contracting,
+    setup_type: candidate.setup,
   };
 }
 
@@ -390,6 +512,9 @@ export function calculatePositionSizing(
   const equity = toDecimal(portfolio.equity);
   const isLimited = market.permissions.new_entries === 'LIMITED';
 
+  // Calculate multipliers if market state is available
+  const multipliers = calculateSizingMultipliers(market.marketState, market.alexState);
+
   // Calculate sizing and evaluate gate for each candidate
   const sizingOutputs: SizingOutput[] = [];
   let totalPlannedDollars = new Decimal(0);
@@ -402,8 +527,11 @@ export function calculatePositionSizing(
     // Evaluate risk gate
     const gate = evaluateGate(candidate, sizing, market, portfolio, mergedConfig);
 
-    // Convert to output
-    const output = toSizingOutput(sizing, gate);
+    // Determine action type (NEW_ENTRY by default, could be ADD if existing position)
+    const actionType: SizingActionType = 'NEW_ENTRY';
+
+    // Convert to output with multipliers and backtest fields from candidate
+    const output = toSizingOutput(sizing, gate, candidate, multipliers, actionType);
     sizingOutputs.push(output);
 
     // Track totals for passed trades
