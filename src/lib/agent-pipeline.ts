@@ -259,6 +259,7 @@ interface DailyScanResult {
 }
 
 const DAILY_CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DAILY_SCAN_STORAGE_KEY = 'pipeline_daily_scan_cache';
 
 const pipelineCache: {
   rsData: CacheEntry<Map<string, RSData>> | null;
@@ -273,6 +274,58 @@ const pipelineCache: {
   earningsData: null,
   dailyScan: null,
 };
+
+/**
+ * Load daily scan cache from localStorage (survives page refreshes)
+ */
+function loadDailyScanFromStorage(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const stored = localStorage.getItem(DAILY_SCAN_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as CacheEntry<DailyScanResult[]>;
+      if (Date.now() - parsed.timestamp < DAILY_CACHE_DURATION_MS) {
+        pipelineCache.dailyScan = parsed;
+        console.log(`[Pipeline] Loaded daily scan from storage (${parsed.data.length} leaders, ${Math.round((Date.now() - parsed.timestamp) / 60000)}min old)`);
+      } else {
+        localStorage.removeItem(DAILY_SCAN_STORAGE_KEY);
+        console.log('[Pipeline] Stored daily scan expired, will run fresh scan');
+      }
+    }
+  } catch (e) {
+    console.error('[Pipeline] Failed to load daily scan from storage:', e);
+  }
+}
+
+/**
+ * Save daily scan cache to localStorage
+ */
+function saveDailyScanToStorage(cache: CacheEntry<DailyScanResult[]>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DAILY_SCAN_STORAGE_KEY, JSON.stringify(cache));
+    console.log('[Pipeline] Saved daily scan to storage');
+  } catch (e) {
+    console.error('[Pipeline] Failed to save daily scan to storage:', e);
+  }
+}
+
+/**
+ * Clear daily scan from localStorage
+ */
+function clearDailyScanFromStorage(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(DAILY_SCAN_STORAGE_KEY);
+  } catch (e) {
+    // Ignore
+  }
+}
+
+// Load cached daily scan on module init (client-side only)
+if (typeof window !== 'undefined') {
+  loadDailyScanFromStorage();
+}
 
 function isCacheValid<T>(entry: CacheEntry<T> | null): boolean {
   return entry !== null && Date.now() - entry.timestamp < CACHE_DURATION_MS;
@@ -291,7 +344,8 @@ export function clearPipelineCache(): void {
   pipelineCache.structureData = null;
   pipelineCache.earningsData = null;
   pipelineCache.dailyScan = null;
-  console.log('[Pipeline] Cache cleared (full)');
+  clearDailyScanFromStorage(); // Also clear localStorage
+  console.log('[Pipeline] Cache cleared (full, including storage)');
 }
 
 /**
@@ -1210,7 +1264,9 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
 
         if (scanData.success && Array.isArray(scanData.liquidLeaders)) {
           dailyScanResults = scanData.liquidLeaders;
-          pipelineCache.dailyScan = { data: dailyScanResults, timestamp: Date.now() };
+          const cacheEntry = { data: dailyScanResults, timestamp: Date.now() };
+          pipelineCache.dailyScan = cacheEntry;
+          saveDailyScanToStorage(cacheEntry); // Persist to localStorage
           console.log(`[Pipeline] Task 2: Daily scan complete - ${dailyScanResults.length} liquid leaders`);
         } else {
           throw new Error('Daily scan failed');
