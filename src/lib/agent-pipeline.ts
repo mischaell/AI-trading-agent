@@ -638,10 +638,20 @@ async function fetchUniverseData(ticker: string): Promise<UniverseDataItem | nul
  */
 async function fetchOHLCData(ticker: string, days: number = 60): Promise<OHLCBar[]> {
   try {
-    const response = await fetch(`${BASE_URL}/api/market-data?ticker=${ticker}&days=${days}`);
-    const data = await response.json() as { data?: OHLCBar[] };
+    const url = `${BASE_URL}/api/market-data?ticker=${ticker}&days=${days}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn(`[Pipeline] OHLC fetch failed for ${ticker}: ${response.status} ${response.statusText}`);
+      return [];
+    }
+    const data = await response.json() as { data?: OHLCBar[]; error?: string };
+    if (data.error) {
+      console.warn(`[Pipeline] OHLC API error for ${ticker}: ${data.error}`);
+      return [];
+    }
     return data.data || [];
-  } catch {
+  } catch (error) {
+    console.error(`[Pipeline] OHLC fetch exception for ${ticker}:`, error);
     return [];
   }
 }
@@ -1005,14 +1015,17 @@ async function fetchCurrentPrices(tickers: string[]): Promise<Map<string, number
  * Apply current market prices to positions
  */
 function applyCurrentPrices(positions: RawPosition[], prices: Map<string, number>): RawPosition[] {
+  console.log(`[Pipeline] Applying prices to ${positions.length} positions, got ${prices.size} prices`);
   return positions.map(pos => {
     const currentPrice = prices.get(pos.ticker);
     if (currentPrice !== undefined) {
+      console.log(`[Pipeline] ${pos.ticker}: entry=$${pos.avg_price.toFixed(2)} -> last=$${currentPrice.toFixed(2)}`);
       return {
         ...pos,
         last_price: currentPrice,
       };
     }
+    console.warn(`[Pipeline] ${pos.ticker}: no price found, using entry price $${pos.avg_price.toFixed(2)}`);
     return pos;
   });
 }
