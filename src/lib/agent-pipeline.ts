@@ -959,15 +959,24 @@ function convertTradeRowToTradeFill(row: TradeRow): RawTradeFill {
 }
 
 /**
+ * Result of fetching current prices
+ */
+interface PriceFetchResult {
+  prices: Map<string, number>;
+  latestDate: string | null;
+}
+
+/**
  * Fetch current prices for a list of tickers
  * Uses the market-data API to get the most recent close price
  */
-async function fetchCurrentPrices(tickers: string[]): Promise<Map<string, number>> {
+async function fetchCurrentPrices(tickers: string[]): Promise<PriceFetchResult> {
   const prices = new Map<string, number>();
   const failed: string[] = [];
+  let latestDate: string | null = null;
 
   if (tickers.length === 0) {
-    return prices;
+    return { prices, latestDate };
   }
 
   console.log(`[Pipeline] Fetching current prices for ${tickers.length} tickers: ${tickers.join(', ')}`);
@@ -983,8 +992,8 @@ async function fetchCurrentPrices(tickers: string[]): Promise<Map<string, number
           if (bars.length > 0) {
             // Get the most recent close price
             const lastBar = bars[bars.length - 1];
-            console.log(`[Pipeline] ${ticker}: fetched price $${lastBar.close.toFixed(2)}`);
-            return { ticker, price: lastBar.close };
+            console.log(`[Pipeline] ${ticker}: fetched price $${lastBar.close.toFixed(2)} (${lastBar.date})`);
+            return { ticker, price: lastBar.close, date: lastBar.date };
           } else {
             console.warn(`[Pipeline] ${ticker}: no OHLC data returned`);
             failed.push(ticker);
@@ -1000,15 +1009,19 @@ async function fetchCurrentPrices(tickers: string[]): Promise<Map<string, number
     for (const result of results) {
       if (result) {
         prices.set(result.ticker, result.price);
+        // Track the most recent date across all tickers
+        if (!latestDate || result.date > latestDate) {
+          latestDate = result.date;
+        }
       }
     }
   }
 
-  console.log(`[Pipeline] Fetched prices for ${prices.size}/${tickers.length} tickers`);
+  console.log(`[Pipeline] Fetched prices for ${prices.size}/${tickers.length} tickers, latest date: ${latestDate}`);
   if (failed.length > 0) {
     console.warn(`[Pipeline] Failed to fetch prices for: ${failed.join(', ')}`);
   }
-  return prices;
+  return { prices, latestDate };
 }
 
 /**
@@ -1031,12 +1044,20 @@ function applyCurrentPrices(positions: RawPosition[], prices: Map<string, number
 }
 
 /**
+ * Result of loading positions with price data
+ */
+interface PositionsWithPriceDate {
+  positions: RawPosition[];
+  priceAsOf: string | null;
+}
+
+/**
  * Load positions from Supabase, return empty array if unavailable
  */
-async function loadPositionsFromDatabase(): Promise<RawPosition[]> {
+async function loadPositionsFromDatabase(): Promise<PositionsWithPriceDate> {
   if (!isSupabaseConfigured()) {
     console.log('[Pipeline] Supabase not configured, using empty positions');
-    return [];
+    return { positions: [], priceAsOf: null };
   }
 
   try {
@@ -1047,14 +1068,17 @@ async function loadPositionsFromDatabase(): Promise<RawPosition[]> {
     // Fetch and apply current market prices
     if (positions.length > 0) {
       const tickers = positions.map(p => p.ticker);
-      const prices = await fetchCurrentPrices(tickers);
-      return applyCurrentPrices(positions, prices);
+      const { prices, latestDate } = await fetchCurrentPrices(tickers);
+      return {
+        positions: applyCurrentPrices(positions, prices),
+        priceAsOf: latestDate,
+      };
     }
 
-    return positions;
+    return { positions, priceAsOf: null };
   } catch (error) {
     console.error('[Pipeline] Failed to load positions:', error);
-    return [];
+    return { positions: [], priceAsOf: null };
   }
 }
 
@@ -1690,9 +1714,10 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     // Task 8: Portfolio - LOAD FROM SUPABASE
     // ─────────────────────────────────────────────────────────────────────────
     await notify('Task 8', 'starting', 90, 'Loading portfolio data...');
-    const positions = await loadPositionsFromDatabase();
+    const { positions, priceAsOf } = await loadPositionsFromDatabase();
     const recentTrades = await loadRecentTradesFromDatabase();
     const portfolio = calculatePortfolio(positions, recentTrades, mockAccount);
+    portfolio.price_as_of = priceAsOf ?? undefined;
     await notify('Task 8', 'complete', 95, `Loaded ${positions.length} positions`);
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1924,15 +1949,16 @@ export async function refreshPortfolioOnly(
 ): Promise<{ portfolio: PortfolioOutput; overview: OverviewOutput }> {
   const mockAccount: AccountContext = { equity, cash };
 
-  const positions = await loadPositionsFromDatabase();
+  const { positions, priceAsOf } = await loadPositionsFromDatabase();
   const recentTrades = await loadRecentTradesFromDatabase();
   const portfolio = calculatePortfolio(positions, recentTrades, mockAccount);
+  portfolio.price_as_of = priceAsOf ?? undefined;
 
   // Also load trades for Trades Today view
   const tradeFills = await loadTradeFillsFromDatabase(24);
   const overview = generateOverview(tradeFills, { lookback_hours: 24 });
 
-  console.log(`[Pipeline] Refreshed: ${positions.length} positions, ${tradeFills.length} trades`);
+  console.log(`[Pipeline] Refreshed: ${positions.length} positions, ${tradeFills.length} trades, prices as of: ${priceAsOf}`);
 
   return { portfolio, overview };
 }

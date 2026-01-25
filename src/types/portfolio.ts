@@ -129,4 +129,6 @@ export interface PortfolioOutput {
   trim_recommendations: TrimRecommendation[];
   /** Timestamp of last update */
   as_of?: string;
+  /** Date of the price data (e.g., "2026-01-23" if Yahoo data is delayed) */
+  price_as_of?: string;
 }

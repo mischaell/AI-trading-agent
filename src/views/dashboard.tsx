@@ -2244,8 +2244,10 @@ function ViewPortfolio({
     };
   }, [positions, summary]);
 
+  // Display when price data is from (important if Yahoo data is delayed)
+  const priceAsOfDisplay = portfolio.price_as_of ?? 'N/A';
   const asOfDisplay = portfolio.as_of
-    ? new Date(portfolio.as_of).toLocaleString()
+    ? new Date(portfolio.as_of).toLocaleTimeString()
     : 'N/A';
 
   return (
@@ -2254,7 +2256,9 @@ function ViewPortfolio({
       <Card className="rounded-2xl shadow-sm">
         <CardContent className="py-3">
           <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap">
-            <Pill>As of {asOfDisplay}</Pill>
+            <Pill tone={priceAsOfDisplay === 'N/A' ? 'warn' : 'neutral'}>
+              Prices: {priceAsOfDisplay}
+            </Pill>
             <Pill>
               Equity{' '}
               {isEditingEquity ? (
