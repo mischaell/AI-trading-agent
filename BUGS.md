@@ -173,6 +173,25 @@ This was redundant and confusing for users.
 
 ---
 
+### 4. Trade Not Showing in Portfolio After Execution (Fixed)
+
+**Files:** `src/views/dashboard.tsx`, `src/lib/agent-pipeline.ts`
+
+**Issue:** After executing a trade via the "Add Trade" modal, the new position did not appear in the Portfolio view or Trades Today view until a full page refresh.
+
+**Root Cause:** Two issues:
+1. **Stale closure bug** - The `refreshPortfolio` function captured `agentState` at creation time, not at execution time. When `setAgentState` was called, it used the stale reference.
+2. **Incomplete refresh** - `refreshPortfolioOnly` only returned portfolio data, not the trades_today data needed for the Trades Today view.
+
+**Fix:**
+1. Changed `setAgentState` to use functional update pattern: `setAgentState(prevState => ({ ...prevState, portfolio }))`
+2. Updated `refreshPortfolioOnly` to return both `portfolio` and `overview` data
+3. Updated `refreshPortfolio` to update both `portfolio` and `overview` in the agent state
+
+**Status:** Fixed - 2026-01-25
+
+---
+
 ## Technical Debt
 
 ### 1. Hardcoded Mock Data
@@ -220,4 +239,4 @@ Consider adding these compiler options to fix iterator issues:
 
 ---
 
-*Last updated: 2026-01-24*
+*Last updated: 2026-01-25*
