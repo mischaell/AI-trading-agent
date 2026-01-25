@@ -96,6 +96,7 @@ import {
   insertMarketSnapshot,
   setUniverseCache,
   setFocusListCache,
+  getFocusListCache,
   getPositions,
   getRecentTrades,
   insertTrade,
@@ -174,13 +175,15 @@ export interface PipelineConfig {
   onProgress?: (progress: PipelineProgress) => void;
   /** Force refresh - bypasses cache */
   forceRefresh?: boolean;
+  /** Skip daily scan if no cache exists (for initial load) */
+  skipDailyScan?: boolean;
 }
 
 // =============================================================================
 // Default Configuration
 // =============================================================================
 
-const DEFAULT_CONFIG: Required<Omit<PipelineConfig, 'onProgress' | 'forceRefresh'>> = {
+const DEFAULT_CONFIG: Required<Omit<PipelineConfig, 'onProgress' | 'forceRefresh' | 'skipDailyScan'>> = {
   equity: 100000,
   cash: 50000,
   tradeLookbackHours: 24,
@@ -1140,9 +1143,21 @@ async function loadTradeFillsFromDatabase(hours: number): Promise<RawTradeFill[]
  */
 export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentState> {
   const startTime = Date.now();
+  const taskTimes: Record<string, number> = {};
+  const markTask = (name: string) => {
+    taskTimes[name] = Date.now() - startTime;
+    console.log(`[Pipeline] ${name} completed at ${taskTimes[name]}ms`);
+  };
   console.log('[Pipeline] Starting pipeline with real data...');
+  console.log('[Pipeline] Raw config:', JSON.stringify({ ...config, onProgress: !!config?.onProgress }));
 
-  const { onProgress, forceRefresh } = config ?? {};
+  const { onProgress, forceRefresh, skipDailyScan } = config ?? {};
+  console.log(`[Pipeline] Extracted: forceRefresh=${forceRefresh}, skipDailyScan=${skipDailyScan}`);
+
+  // Ensure localStorage cache is loaded (handles Next.js SSR edge case)
+  loadDailyScanFromStorage();
+  const hasCachedDailyScan = isDailyCacheValid(pipelineCache.dailyScan);
+  console.log(`[Pipeline] Cache state: hasCachedDailyScan=${hasCachedDailyScan}`);
 
   // Debug: check if callback is provided
   console.log('[Pipeline] onProgress callback provided:', !!onProgress);
@@ -1280,12 +1295,21 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     let universeItemData: Map<string, UniverseDataItem> = new Map();
 
     // Check if we have cached daily scan results
-    if (isDailyCacheValid(pipelineCache.dailyScan)) {
+    const cacheValid = isDailyCacheValid(pipelineCache.dailyScan);
+    console.log(`[Pipeline] Task 2: cacheValid=${cacheValid}, skipDailyScan=${skipDailyScan}`);
+
+    if (cacheValid) {
       dailyScanResults = pipelineCache.dailyScan!.data;
       console.log(`[Pipeline] Task 2: Using cached daily scan (${dailyScanResults.length} liquid leaders)`);
       await notify('Task 2', 'running', 15, `Using cached scan: ${dailyScanResults.length} liquid leaders`);
+    } else if (skipDailyScan) {
+      // Skip daily scan on initial load - use empty results
+      console.log('[Pipeline] Task 2: SKIPPING daily scan (no cache, skipDailyScan=true)');
+      await notify('Task 2', 'running', 15, 'No cached data. Click EOD Refresh to load.');
+      dailyScanResults = [];
     } else {
       // Need to run daily scan - this takes 2-3 minutes
+      console.log('[Pipeline] Task 2: NO CACHE AND skipDailyScan=false, running full scan...');
       await notify('Task 2', 'running', 12, 'Running full Nasdaq scan (this takes 2-3 min)...');
       console.log('[Pipeline] Task 2: Running full daily scan...');
 
@@ -1449,6 +1473,7 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       }
 
       pipelineCache.structureData = { data: structureData, timestamp: Date.now() };
+      console.log(`[Pipeline] Task 3: Fetched structure data for ${structureData.size} tickers`);
     }
 
     // Build pullback candidates from real structure data
@@ -1618,53 +1643,117 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     // ─────────────────────────────────────────────────────────────────────────
     await notify('Task 5', 'starting', 65, 'Ranking focus list...');
 
-    // Use all pullback candidates for focus list ranking (not just ready ones)
-    const focusInput: FocusListTickerData[] = readiness.rows.map((r, i) => {
-      const structure = structureData.get(r.ticker);
-      const rsItem = rsData.get(r.ticker);
+    let focusList: FocusListOutput;
 
-      return {
-        ticker: r.ticker,
-        ready: true,
-        mode: r.mode,
-        dist_to_21ema_atr: r.dist_to_21ema_atr,
-        earnings_days: r.earnings_days ?? 30,
-        setup: r.setup ?? 'Pullback to 21EMA',
-        entry_trigger: r.entry_trigger ?? 'Close above prior high',
-        ready_grade: calculateReadyGrade(
-          r.dist_to_21ema_atr,
-          structure?.close_range_pct ?? 50,
-          structure?.is_contracting ?? false,
-          structure?.weekly_return_pct ?? 5
-        ),
-        contraction: structure?.is_contracting ?? false,
-        close_range_pct: structure?.close_range_pct ?? 50,
-        rs: rsItem?.rs ?? 80,
-        theme: TICKER_THEMES[r.ticker] || 'Unknown',
-        reclaim_backtest_grade: calculateReadyGrade(
-          r.dist_to_21ema_atr,
-          structure?.close_range_pct ?? 50,
-          structure?.is_contracting ?? false,
-          structure?.weekly_return_pct ?? 5
-        ),
-        price: structure?.close ?? 0,
-      };
-    });
+    // If no readiness data (skipDailyScan with no cache), try to load from Supabase
+    if (readiness.rows.length === 0 && skipDailyScan) {
+      console.log('[Pipeline] Task 5: No readiness data, loading focus list from Supabase cache...');
+      try {
+        const cachedFocusList = await getFocusListCache();
+        if (cachedFocusList && cachedFocusList.candidates) {
+          console.log(`[Pipeline] Task 5: Loaded ${cachedFocusList.candidates.length} candidates from Supabase cache`);
+          focusList = {
+            top5: cachedFocusList.top5 ?? [],
+            manual_promotion: cachedFocusList.manual_promotion ?? null,
+            candidates: cachedFocusList.candidates as FocusListCandidate[],
+          };
+          const top5Tickers = focusList.top5.join(', ') || 'None';
+          await notify('Task 5', 'complete', 75, `Loaded from cache: ${top5Tickers}`);
+        } else {
+          console.log('[Pipeline] Task 5: No cached focus list found');
+          focusList = { top5: [], manual_promotion: null, candidates: [] };
+          await notify('Task 5', 'complete', 75, 'No cached data. Run EOD Refresh.');
+        }
+      } catch (error) {
+        console.error('[Pipeline] Task 5: Failed to load focus list cache:', error);
+        focusList = { top5: [], manual_promotion: null, candidates: [] };
+        await notify('Task 5', 'complete', 75, 'Cache load failed');
+      }
+    } else {
+      // Use all pullback candidates for focus list ranking (not just ready ones)
+      const focusInput: FocusListTickerData[] = readiness.rows.map((r, i) => {
+        const structure = structureData.get(r.ticker);
+        const rsItem = rsData.get(r.ticker);
 
-    const focusList = rankFocusList(focusInput);
-    const top5Tickers = focusList.top5.join(', ') || 'None';
-    await notify('Task 5', 'complete', 75, `Top 5: ${top5Tickers}`);
+        return {
+          ticker: r.ticker,
+          ready: true,
+          mode: r.mode,
+          dist_to_21ema_atr: r.dist_to_21ema_atr,
+          earnings_days: r.earnings_days ?? 30,
+          setup: r.setup ?? 'Pullback to 21EMA',
+          entry_trigger: r.entry_trigger ?? 'Close above prior high',
+          ready_grade: calculateReadyGrade(
+            r.dist_to_21ema_atr,
+            structure?.close_range_pct ?? 50,
+            structure?.is_contracting ?? false,
+            structure?.weekly_return_pct ?? 5
+          ),
+          contraction: structure?.is_contracting ?? false,
+          close_range_pct: structure?.close_range_pct ?? 50,
+          rs: rsItem?.rs ?? 50,
+          theme: TICKER_THEMES[r.ticker] || 'Unknown',
+          reclaim_backtest_grade: calculateReadyGrade(
+            r.dist_to_21ema_atr,
+            structure?.close_range_pct ?? 50,
+            structure?.is_contracting ?? false,
+            structure?.weekly_return_pct ?? 5
+          ),
+          price: structure?.close ?? 0,
+          is_approximated: !structure, // Flag when structure data is missing
+        };
+      });
 
-    // >>> PERSIST: Cache focus list to Supabase (non-blocking)
-    saveFocusListCache(focusList, today).catch(e => console.error('[Pipeline] Focus cache error:', e));
+      focusList = rankFocusList(focusInput);
+      const top5Tickers = focusList.top5.join(', ') || 'None';
+      await notify('Task 5', 'complete', 75, `Top 5: ${top5Tickers}`);
+
+      // >>> PERSIST: Cache focus list to Supabase (non-blocking)
+      saveFocusListCache(focusList, today).catch(e => console.error('[Pipeline] Focus cache error:', e));
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Task 6: Position Sizing & Risk Gate
     // ─────────────────────────────────────────────────────────────────────────
     await notify('Task 6', 'starting', 75, 'Calculating position sizes...');
 
+    // If structure data is empty but we have focus list candidates, fetch structure data for them
+    // This happens when loading focus list from cache (skipDailyScan path)
+    if (structureData.size === 0 && focusList.candidates && focusList.candidates.length > 0) {
+      console.log(`[Pipeline] Task 6: No structure data - fetching for ${focusList.candidates.length} focus list tickers`);
+      const BATCH_SIZE = 5;
+      const candidates = focusList.candidates;
+
+      for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+        const batch = candidates.slice(i, i + BATCH_SIZE);
+        const batchPromises = batch.map(async (candidate) => {
+          const ohlc = await fetchOHLCData(candidate.ticker, 60);
+          const structure = analyzeTickerStructure(candidate.ticker, ohlc);
+          return { ticker: candidate.ticker, structure };
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        for (const { ticker, structure } of batchResults) {
+          if (structure) structureData.set(ticker, structure);
+        }
+
+        // Rate limiting
+        if (i + BATCH_SIZE < candidates.length) {
+          await delay(300);
+        }
+      }
+      console.log(`[Pipeline] Task 6: Fetched structure data for ${structureData.size} tickers`);
+    }
+
+    // Log how many have real structure data
+    const candidatesWithStructure = (focusList.candidates ?? []).filter(c => structureData.has(c.ticker)).length;
+    const totalCandidates = focusList.candidates?.length ?? 0;
+    console.log(`[Pipeline] Task 6: ${candidatesWithStructure}/${totalCandidates} candidates have real structure data`);
+
     const sizingInput: SizingTickerData[] = (focusList.candidates ?? []).map(c => {
       const structure = structureData.get(c.ticker);
+      // Use structure data if available, otherwise fall back to focus list cached price
+      const currentPrice = structure?.close ?? c.price ?? 0;
       return {
         rank: c.rank,
         ticker: c.ticker,
@@ -1675,9 +1764,9 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
         dist_to_21ema_atr: c.dist_to_21ema_atr,
         earnings_days: c.earnings_days,
         reclaim_backtest_grade: c.reclaim_backtest_grade,
-        price: structure?.close ?? 100,
-        ema21_low: structure?.ema21_low ?? 98,
-        atr: structure?.atr14 ?? 2,
+        price: currentPrice,
+        ema21_low: structure?.ema21_low ?? (currentPrice * 0.98), // Approximate 21EMA low as 2% below price
+        atr: structure?.atr14 ?? (currentPrice * 0.02), // Approximate ATR as 2% of price
         // Backtest-style scoring fields from focus list
         score: c.score,
         rs: c.rs,

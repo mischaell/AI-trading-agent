@@ -80,13 +80,14 @@ export interface MarketContext {
  * Sizing configuration
  */
 export interface SizingConfig {
+  // === LEGACY: Fixed position % sizing (deprecated) ===
   /** MODE1 position size range [min, max] (default: [10, 12]) */
   mode1_position_pct?: [number, number];
   /** MODE2 position size range [min, max] (default: [12, 15]) */
   mode2_position_pct?: [number, number];
-  /** MODE1 max NER (default: 0.25%) */
+  /** MODE1 max NER (default: 0.25%) - DEPRECATED: use portfolio_max_ner_pct */
   mode1_max_ner_pct?: number;
-  /** MODE2 max NER (default: 0.50%) */
+  /** MODE2 max NER (default: 0.50%) - DEPRECATED: use portfolio_max_ner_pct */
   mode2_max_ner_pct?: number;
   /** Min earnings days (default: 7) */
   min_earnings_days?: number;
@@ -95,8 +96,44 @@ export interface SizingConfig {
   /** Size reduction factor for LIMITED (default: 0.5) */
   limited_size_factor?: number;
 
-  // === NEW: Multiplier-based sizing options ===
+  // === DYNAMIC RISK-BASED SIZING (NEW) ===
 
+  /** Use dynamic risk-based sizing (default: true) */
+  use_dynamic_sizing?: boolean;
+  /** Base risk % per trade (default: 0.50%) */
+  base_risk_pct?: number;
+  /** Min position % of equity (default: 5%) */
+  min_position_pct?: number;
+  /** Max position % of equity (default: 20%) */
+  max_position_pct?: number;
+  /** Max portfolio NER % (default: 3.0%) */
+  portfolio_max_ner_pct?: number;
+
+  // === GRADE MULTIPLIERS ===
+  /** Grade A multiplier (default: 1.0) */
+  grade_a_multiplier?: number;
+  /** Grade B multiplier (default: 0.8) */
+  grade_b_multiplier?: number;
+  /** Grade C multiplier (default: 0.6) */
+  grade_c_multiplier?: number;
+
+  // === MODE MULTIPLIERS ===
+  /** MODE1 multiplier (default: 0.8) */
+  mode1_multiplier?: number;
+  /** MODE2 multiplier (default: 1.0) */
+  mode2_multiplier?: number;
+
+  // === ATR FILTER THRESHOLDS ===
+  /** ATR ratio threshold for "dangerous" (default: 0.75) */
+  atr_dangerous_threshold?: number;
+  /** ATR ratio threshold for "marginal" (default: 1.25) */
+  atr_marginal_threshold?: number;
+  /** Multiplier for dangerous ATR ratio (default: 0.50) */
+  atr_dangerous_multiplier?: number;
+  /** Multiplier for marginal ATR ratio (default: 0.75) */
+  atr_marginal_multiplier?: number;
+
+  // === LEGACY MULTIPLIER-BASED SIZING ===
   /** Use multiplier-based sizing (default: false for backwards compatibility) */
   use_multiplier_sizing?: boolean;
   /** Base NER for multiplier sizing (default: 1.5%) */
@@ -143,6 +180,7 @@ interface GateEvaluation {
  * Default sizing configuration from agent_skeleton Section 6
  */
 export const DEFAULT_SIZING_CONFIG: Required<SizingConfig> = {
+  // Legacy fixed sizing
   mode1_position_pct: [10, 12],
   mode2_position_pct: [12, 15],
   mode1_max_ner_pct: 0.25,
@@ -150,7 +188,30 @@ export const DEFAULT_SIZING_CONFIG: Required<SizingConfig> = {
   min_earnings_days: 7,
   reduce_size_for_limited: true,
   limited_size_factor: 0.5,
-  // NEW: Multiplier-based sizing defaults
+
+  // Dynamic risk-based sizing (NEW - enabled by default)
+  use_dynamic_sizing: true,
+  base_risk_pct: 0.50,
+  min_position_pct: 5,
+  max_position_pct: 20,
+  portfolio_max_ner_pct: 3.0,
+
+  // Grade multipliers
+  grade_a_multiplier: 1.0,
+  grade_b_multiplier: 0.8,
+  grade_c_multiplier: 0.6,
+
+  // Mode multipliers
+  mode1_multiplier: 0.8,
+  mode2_multiplier: 1.0,
+
+  // ATR filter thresholds
+  atr_dangerous_threshold: 0.75,
+  atr_marginal_threshold: 1.25,
+  atr_dangerous_multiplier: 0.50,
+  atr_marginal_multiplier: 0.75,
+
+  // Legacy multiplier-based sizing
   use_multiplier_sizing: false,
   base_ner_pct: 1.5,
   portfolio_equity: 100000,
@@ -213,6 +274,65 @@ export function calculateSizingMultipliers(
     qqqe_position: qqqePosition,
     combined,
   };
+}
+
+/**
+ * Calculate ATR-based sizing multiplier
+ * Penalizes setups where stop is too tight relative to volatility
+ */
+export function calculateAtrMultiplier(
+  stopDistance: number,
+  atr: number,
+  config: Required<SizingConfig>
+): { ratio: number; multiplier: number; label: string } {
+  if (atr <= 0 || stopDistance <= 0) {
+    return { ratio: 0, multiplier: 1.0, label: 'unknown' };
+  }
+
+  const ratio = stopDistance / atr;
+
+  if (ratio < config.atr_dangerous_threshold) {
+    return {
+      ratio,
+      multiplier: config.atr_dangerous_multiplier,
+      label: 'dangerous',
+    };
+  }
+
+  if (ratio < config.atr_marginal_threshold) {
+    return {
+      ratio,
+      multiplier: config.atr_marginal_multiplier,
+      label: 'marginal',
+    };
+  }
+
+  return { ratio, multiplier: 1.0, label: 'healthy' };
+}
+
+/**
+ * Get grade multiplier
+ */
+function getGradeMultiplier(
+  grade: 'A' | 'B' | 'C' | undefined,
+  config: Required<SizingConfig>
+): number {
+  switch (grade) {
+    case 'A': return config.grade_a_multiplier;
+    case 'B': return config.grade_b_multiplier;
+    case 'C': return config.grade_c_multiplier;
+    default: return config.grade_b_multiplier; // Default to B
+  }
+}
+
+/**
+ * Get mode multiplier
+ */
+function getModeMultiplier(
+  mode: EntryMode,
+  config: Required<SizingConfig>
+): number {
+  return mode === 'MODE1' ? config.mode1_multiplier : config.mode2_multiplier;
 }
 
 /**
@@ -338,22 +458,148 @@ function calculateSizing(
   };
 }
 
+/**
+ * Extended sizing calculation with ATR fields
+ */
+interface DynamicSizingCalculation extends SizingCalculation {
+  atr: Decimal;
+  atr_ratio: number;
+  atr_multiplier: number;
+  atr_label: string;
+  was_clamped: 'floor' | 'ceiling' | null;
+  target_risk_pct: number;
+}
+
+/**
+ * Calculate DYNAMIC position sizing for a single candidate
+ * Risk-based sizing: sizes to target risk, then clamps to 5-20% bounds
+ */
+function calculateDynamicSizing(
+  candidate: SizingTickerData,
+  equity: Decimal,
+  config: Required<SizingConfig>,
+  isLimited: boolean
+): DynamicSizingCalculation {
+  const entry = toDecimal(candidate.price);
+  let ssl = toDecimal(candidate.ema21_low);
+  const atr = toDecimal(candidate.atr || 0);
+  const mode = candidate.mode;
+  const grade = candidate.reclaim_backtest_grade as 'A' | 'B' | 'C' | undefined;
+
+  // Step 1: Calculate R per share (stop distance)
+  // If SSL >= Entry (invalid - e.g., price below 21EMA low), use ATR-based fallback
+  if (ssl.gte(entry)) {
+    // Fallback: Use 1.5 ATR below entry, or 3% below if no ATR
+    const fallbackStop = atr.gt(0)
+      ? entry.minus(atr.times(1.5))
+      : entry.times(0.97);
+    ssl = fallbackStop;
+  }
+
+  const rPerShare = entry.minus(ssl);
+  const stopDistance = rPerShare.toNumber();
+
+  // Step 2: Calculate ATR multiplier
+  const atrResult = calculateAtrMultiplier(stopDistance, atr.toNumber(), config);
+
+  // Step 3: Calculate target risk with all multipliers
+  const baseRiskPct = toDecimal(config.base_risk_pct);
+  const gradeMultiplier = toDecimal(getGradeMultiplier(grade, config));
+  const modeMultiplier = toDecimal(getModeMultiplier(mode, config));
+  const atrMultiplier = toDecimal(atrResult.multiplier);
+  const limitedMultiplier = isLimited ? toDecimal(config.limited_size_factor) : toDecimal(1);
+
+  const targetRiskPct = baseRiskPct
+    .times(gradeMultiplier)
+    .times(modeMultiplier)
+    .times(atrMultiplier)
+    .times(limitedMultiplier);
+
+  const targetRiskDollars = equity.times(targetRiskPct).div(100);
+
+  // Step 4: Calculate shares based on target risk
+  let shares: number;
+  if (rPerShare.isZero() || rPerShare.isNegative()) {
+    shares = 0;
+  } else {
+    shares = targetRiskDollars.div(rPerShare).floor().toNumber();
+  }
+
+  // Step 5: Calculate position size and check bounds
+  let positionDollars = toDecimal(shares).times(entry);
+  let positionPercent = positionDollars.div(equity).times(100);
+  let wasClamped: 'floor' | 'ceiling' | null = null;
+
+  const minPct = toDecimal(config.min_position_pct);
+  const maxPct = toDecimal(config.max_position_pct);
+
+  // Clamp to ceiling (20%)
+  if (positionPercent.gt(maxPct)) {
+    wasClamped = 'ceiling';
+    const maxDollars = equity.times(maxPct).div(100);
+    shares = maxDollars.div(entry).floor().toNumber();
+    positionDollars = toDecimal(shares).times(entry);
+    positionPercent = positionDollars.div(equity).times(100);
+  }
+
+  // Clamp to floor (5%) - only if we have valid shares
+  if (positionPercent.lt(minPct) && shares > 0) {
+    wasClamped = 'floor';
+    const minDollars = equity.times(minPct).div(100);
+    shares = minDollars.div(entry).floor().toNumber();
+    positionDollars = toDecimal(shares).times(entry);
+    positionPercent = positionDollars.div(equity).times(100);
+  }
+
+  // Step 6: Recalculate actual risk after clamping
+  const totalRiskDollars = rPerShare.times(shares);
+  const ecRiskPercent = totalRiskDollars.div(equity).times(100);
+  const nerPercent = ecRiskPercent;
+
+  // Step 7: Calculate 2R trim price
+  const trim2rPrice = entry.plus(rPerShare.times(2));
+
+  return {
+    ticker: candidate.ticker,
+    mode,
+    position_percent: positionPercent,
+    position_dollars: positionDollars,
+    entry,
+    ssl,
+    shares,
+    r_per_share: rPerShare,
+    trim_2r_price: trim2rPrice,
+    ec_risk_percent: ecRiskPercent,
+    ner_percent: nerPercent,
+    // Dynamic sizing specific fields
+    atr,
+    atr_ratio: atrResult.ratio,
+    atr_multiplier: atrResult.multiplier,
+    atr_label: atrResult.label,
+    was_clamped: wasClamped,
+    target_risk_pct: targetRiskPct.toNumber(),
+  };
+}
+
 // =============================================================================
 // Risk Gate Evaluation
 // =============================================================================
 
 /**
  * Evaluate risk gate for a candidate
+ * @param useDynamicSizing - If true, skips per-trade NER check (sizing already adjusted)
+ * @param portfolioNerPct - Current portfolio NER % (for portfolio-level check)
  */
 function evaluateGate(
   candidate: SizingTickerData,
   sizing: SizingCalculation,
   market: MarketContext,
   portfolio: PortfolioContext,
-  config: Required<SizingConfig>
+  config: Required<SizingConfig>,
+  useDynamicSizing: boolean = false,
+  portfolioNerPct: number = 0
 ): GateEvaluation {
   const details: string[] = [];
-  const maxNer = getMaxNer(candidate.mode, config);
 
   // Gate 1: Market regime forbids new entries
   if (market.permissions.new_entries === 'NO') {
@@ -373,16 +619,37 @@ function evaluateGate(
     };
   }
 
-  // Gate 3: NER exceeds allowed (with small tolerance for floating point)
-  const nerTolerance = toDecimal(0.01); // 0.01% tolerance
-  if (sizing.ner_percent.gt(maxNer.plus(nerTolerance))) {
-    return {
-      gate: 'WITHHOLD',
-      reason: 'ner_exceeds_limit',
-      details: [
-        `NER ${sizing.ner_percent.toFixed(2)}% exceeds ${candidate.mode} limit of ${maxNer.toFixed(2)}%`,
-      ],
-    };
+  // Gate 3: NER check - differs between legacy and dynamic modes
+  if (useDynamicSizing) {
+    // DYNAMIC MODE: Check portfolio-level NER only
+    const maxPortfolioNer = toDecimal(config.portfolio_max_ner_pct);
+    const currentPortfolioNer = toDecimal(portfolioNerPct);
+    const newPortfolioNer = currentPortfolioNer.plus(sizing.ner_percent);
+
+    if (newPortfolioNer.gt(maxPortfolioNer)) {
+      return {
+        gate: 'WITHHOLD',
+        reason: 'portfolio_ner_exceeded',
+        details: [
+          `Portfolio NER would be ${newPortfolioNer.toFixed(2)}%, exceeds max ${maxPortfolioNer.toFixed(2)}%`,
+          `Current: ${currentPortfolioNer.toFixed(2)}%, This trade: ${sizing.ner_percent.toFixed(2)}%`,
+        ],
+      };
+    }
+    details.push(`Portfolio NER OK: ${newPortfolioNer.toFixed(2)}% / ${maxPortfolioNer.toFixed(2)}% max`);
+  } else {
+    // LEGACY MODE: Check per-trade NER limit
+    const maxNer = getMaxNer(candidate.mode, config);
+    const nerTolerance = toDecimal(0.01); // 0.01% tolerance
+    if (sizing.ner_percent.gt(maxNer.plus(nerTolerance))) {
+      return {
+        gate: 'WITHHOLD',
+        reason: 'ner_exceeds_limit',
+        details: [
+          `NER ${sizing.ner_percent.toFixed(2)}% exceeds ${candidate.mode} limit of ${maxNer.toFixed(2)}%`,
+        ],
+      };
+    }
   }
 
   // Gate 4: Would exceed max exposure (optional check)
@@ -423,7 +690,7 @@ function evaluateGate(
  * Convert sizing calculation and gate result to SizingOutput
  */
 function toSizingOutput(
-  sizing: SizingCalculation,
+  sizing: SizingCalculation | DynamicSizingCalculation,
   gate: GateEvaluation,
   candidate: SizingTickerData,
   multipliers?: SizingMultipliers,
@@ -435,6 +702,10 @@ function toSizingOutput(
   const ecRiskPct = sizing.ec_risk_percent.toNumber();
   const trim2rPrice = sizing.trim_2r_price.toNumber();
   const action = actionType || 'NEW_ENTRY';
+
+  // Check if this is a dynamic sizing calculation (has ATR fields)
+  const isDynamic = 'atr_ratio' in sizing;
+  const dynamicSizing = isDynamic ? (sizing as DynamicSizingCalculation) : null;
 
   return {
     task: 'sizing',
@@ -464,6 +735,12 @@ function toSizingOutput(
     close_range_pct: candidate.close_range_pct,
     is_contracting: candidate.is_contracting,
     setup_type: candidate.setup,
+    // Dynamic sizing fields (only present when using dynamic sizing)
+    atr: dynamicSizing?.atr.toNumber(),
+    atr_ratio: dynamicSizing?.atr_ratio,
+    atr_multiplier: dynamicSizing?.atr_multiplier,
+    was_clamped: dynamicSizing?.was_clamped,
+    target_risk_pct: dynamicSizing?.target_risk_pct,
   };
 }
 
@@ -512,6 +789,7 @@ export function calculatePositionSizing(
 
   const equity = toDecimal(portfolio.equity);
   const isLimited = market.permissions.new_entries === 'LIMITED';
+  const useDynamicSizing = mergedConfig.use_dynamic_sizing;
 
   // Calculate multipliers if market state is available
   const multipliers = calculateSizingMultipliers(market.marketState, market.alexState);
@@ -521,12 +799,25 @@ export function calculatePositionSizing(
   let totalPlannedDollars = new Decimal(0);
   let totalPlannedRiskPct = new Decimal(0);
 
-  for (const candidate of candidates) {
-    // Calculate sizing
-    const sizing = calculateSizing(candidate, equity, mergedConfig, isLimited);
+  // Track portfolio NER for dynamic sizing (starts with current portfolio NER)
+  let portfolioNerPct = portfolio.current_ner_pct ?? 0;
 
-    // Evaluate risk gate
-    const gate = evaluateGate(candidate, sizing, market, portfolio, mergedConfig);
+  for (const candidate of candidates) {
+    // Calculate sizing using dynamic or legacy method
+    const sizing = useDynamicSizing
+      ? calculateDynamicSizing(candidate, equity, mergedConfig, isLimited)
+      : calculateSizing(candidate, equity, mergedConfig, isLimited);
+
+    // Evaluate risk gate (pass portfolio NER for dynamic mode)
+    const gate = evaluateGate(
+      candidate,
+      sizing,
+      market,
+      portfolio,
+      mergedConfig,
+      useDynamicSizing,
+      portfolioNerPct
+    );
 
     // Determine action type (NEW_ENTRY by default, could be ADD if existing position)
     const actionType: SizingActionType = 'NEW_ENTRY';
@@ -539,6 +830,8 @@ export function calculatePositionSizing(
     if (gate.gate === 'PASS') {
       totalPlannedDollars = totalPlannedDollars.plus(sizing.position_dollars);
       totalPlannedRiskPct = totalPlannedRiskPct.plus(sizing.ec_risk_percent);
+      // Update portfolio NER for next candidate's gate check
+      portfolioNerPct += sizing.ner_percent.toNumber();
     }
   }
 

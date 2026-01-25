@@ -47,6 +47,8 @@ export interface FocusListCandidate {
   dist_to_21ema_atr: number;
   /** Days until earnings */
   earnings_days: number;
+  /** Whether earnings date is unknown (999 fallback used) */
+  earnings_unknown?: boolean;
   /** Reclaim/backtest quality grade */
   reclaim_backtest_grade: ReclaimBacktestGrade;
   /** Whether this candidate was manually promoted */
@@ -64,6 +66,8 @@ export interface FocusListCandidate {
   close_range_pct?: number;
   /** Whether contracting */
   is_contracting?: boolean;
+  /** Whether structure data is approximated (no real data available) */
+  is_approximated?: boolean;
 }
 
 /**

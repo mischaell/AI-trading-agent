@@ -50,6 +50,8 @@ export interface FocusListTickerData extends ReadinessRow {
   reclaim_backtest_grade?: ReclaimBacktestGrade;
   /** Current price */
   price?: number;
+  /** Whether structure data is approximated (no real data available) */
+  is_approximated?: boolean;
 }
 
 /**
@@ -388,7 +390,8 @@ function toFocusListCandidate(
     setup: data.setup ?? '',
     entry_trigger: data.entry_trigger ?? '',
     dist_to_21ema_atr: data.dist_to_21ema_atr,
-    earnings_days: data.earnings_days ?? 0,
+    earnings_days: data.earnings_days ?? 999,
+    earnings_unknown: data.earnings_days === undefined || data.earnings_days === null,
     reclaim_backtest_grade: data.reclaim_backtest_grade ?? (data.ready_grade as ReclaimBacktestGrade),
     is_promoted: scored.is_promoted,
     // Backtest-style scoring fields
@@ -397,6 +400,7 @@ function toFocusListCandidate(
     price: data.price,
     close_range_pct: data.close_range_pct,
     is_contracting: data.contraction,
+    is_approximated: data.is_approximated,
   };
 }
 

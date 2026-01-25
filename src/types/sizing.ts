@@ -20,6 +20,7 @@ export type GateResult = 'PASS' | 'WITHHOLD';
 export type WithholdReason =
   | 'regime_forbids_entries'
   | 'ner_exceeds_limit'
+  | 'portfolio_ner_exceeded'
   | 'earnings_too_close'
   | 'exposure_limit_reached';
 
@@ -111,6 +112,19 @@ export interface SizingOutput {
   is_contracting?: boolean;
   /** Setup type description */
   setup_type?: string;
+
+  // === Dynamic Sizing Fields ===
+
+  /** ATR value used for volatility assessment */
+  atr?: number;
+  /** Stop distance in ATR units (stop_dist / ATR) */
+  atr_ratio?: number;
+  /** ATR-based sizing multiplier (0.5-1.0) */
+  atr_multiplier?: number;
+  /** Whether position was clamped to bounds */
+  was_clamped?: 'floor' | 'ceiling' | null;
+  /** Target risk % before multipliers */
+  target_risk_pct?: number;
 }
 
 /**

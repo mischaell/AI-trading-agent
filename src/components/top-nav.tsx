@@ -103,13 +103,14 @@ export function TopNav({
         </div>
       </div>
 
-      {/* Mobile tabs */}
+      {/* Mobile tabs - 4 essential views */}
       <div className="mx-auto max-w-[1400px] px-4 pb-3 md:hidden">
         <Tabs value={active} onValueChange={handleNavChange}>
-          <TabsList className="grid w-full grid-cols-3 rounded-2xl">
-            <TabsTrigger value="Market State">Market</TabsTrigger>
-            <TabsTrigger value="Focus List">Focus</TabsTrigger>
-            <TabsTrigger value="Portfolio">Portfolio</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4 rounded-2xl">
+            <TabsTrigger value="Market State" className="text-xs px-1">Market</TabsTrigger>
+            <TabsTrigger value="Focus List" className="text-xs px-1">Focus</TabsTrigger>
+            <TabsTrigger value="Suggested Trades" className="text-xs px-1">Trades</TabsTrigger>
+            <TabsTrigger value="Portfolio" className="text-xs px-1">Portfolio</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
