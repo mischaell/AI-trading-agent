@@ -2532,13 +2532,18 @@ export default function TradingAgentDashboard() {
       notes: `Trim 1/3 at ${rec.current_r.toFixed(2)}R. Entry: $${rec.entry_price.toFixed(2)}, SSL: $${rec.ssl.toFixed(2)}`,
     };
 
+    console.log('[Dashboard] Saving trim trade:', trade);
     const result = await saveTradeToDatabase(trade);
+    console.log('[Dashboard] Trim trade saved result:', result);
+
     if (!result) {
-      throw new Error('Failed to save trim trade');
+      throw new Error('Failed to save trim trade - check if Supabase is configured');
     }
 
     // Refresh portfolio after successful trim
+    console.log('[Dashboard] Trim saved, refreshing portfolio...');
     await refreshPortfolio();
+    console.log('[Dashboard] Portfolio refresh complete after trim');
   };
 
   // Sell handler - sells specified number of shares
@@ -2561,13 +2566,19 @@ export default function TradingAgentDashboard() {
         : `Partial sell (${shares} shares) at ${(sellPosition.total_r ?? 0).toFixed(2)}R`,
     };
 
+    console.log('[Dashboard] Saving sell trade:', trade);
     const result = await saveTradeToDatabase(trade);
+    console.log('[Dashboard] Sell trade saved result:', result);
+
     if (!result) {
-      throw new Error('Failed to save sell trade');
+      throw new Error('Failed to save sell trade - check if Supabase is configured');
     }
 
     // Refresh portfolio after successful sell
+    console.log('[Dashboard] Sell saved, refreshing portfolio...');
     await refreshPortfolio();
+    console.log('[Dashboard] Portfolio refresh complete after sell');
+    // Note: SellModal closes itself after onConfirm resolves
   };
 
   // Add Trade handler - creates new position or adds to existing
