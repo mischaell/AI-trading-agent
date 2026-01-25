@@ -13,6 +13,7 @@ export interface MarketStateStripProps {
   stateLabel: string;
   permissions?: MarketPermissions;
   onEodRefresh?: () => void;
+  onQuickRefresh?: () => void;
 }
 
 const defaultPermissions: MarketPermissions = {
@@ -26,6 +27,7 @@ export function MarketStateStrip({
   stateLabel,
   permissions = defaultPermissions,
   onEodRefresh,
+  onQuickRefresh,
 }: MarketStateStripProps) {
   // Dynamic button styles based on permission state
   const permissionStyle = (enabled: boolean) =>
@@ -71,13 +73,22 @@ export function MarketStateStrip({
             </div>
           </div>
 
-          {/* EOD Refresh on the right */}
-          <Button
-            className="rounded-full bg-zinc-900 text-white hover:bg-zinc-800"
-            onClick={onEodRefresh}
-          >
-            EOD Refresh <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
+          {/* Refresh buttons on the right */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="rounded-full border-zinc-300 text-zinc-700 hover:bg-zinc-100"
+              onClick={onQuickRefresh}
+            >
+              Quick Refresh
+            </Button>
+            <Button
+              className="rounded-full bg-zinc-900 text-white hover:bg-zinc-800"
+              onClick={onEodRefresh}
+            >
+              EOD Refresh <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

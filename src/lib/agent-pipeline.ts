@@ -291,7 +291,20 @@ export function clearPipelineCache(): void {
   pipelineCache.structureData = null;
   pipelineCache.earningsData = null;
   pipelineCache.dailyScan = null;
-  console.log('[Pipeline] Cache cleared');
+  console.log('[Pipeline] Cache cleared (full)');
+}
+
+/**
+ * Quick cache clear - keeps daily scan cache, only clears structure/analysis data
+ * Use this for testing when you don't need to re-scan the full Nasdaq universe
+ */
+export function clearQuickCache(): void {
+  pipelineCache.rsData = null;
+  pipelineCache.universeData = null;
+  pipelineCache.structureData = null;
+  pipelineCache.earningsData = null;
+  // Keep dailyScan cache intact - it's valid for 24 hours
+  console.log('[Pipeline] Quick cache cleared (kept daily scan)');
 }
 
 // =============================================================================

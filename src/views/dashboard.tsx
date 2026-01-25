@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { PortfolioPosition, TrimRecommendation } from "@/types";
 
 // Pipeline imports
-import { runAgentPipeline, AgentState, saveTradeToDatabase, TradeInput, PipelineProgress, clearPipelineCache, refreshPortfolioOnly } from "@/lib/agent-pipeline";
+import { runAgentPipeline, AgentState, saveTradeToDatabase, TradeInput, PipelineProgress, clearPipelineCache, clearQuickCache, refreshPortfolioOnly } from "@/lib/agent-pipeline";
 import { calculateTradeStats } from "@/tasks/overview";
 
 // =============================================================================
@@ -2648,6 +2648,38 @@ export default function TradingAgentDashboard() {
     }
   };
 
+  // Quick Refresh handler - keeps daily scan cache, only refreshes structure/analysis
+  const handleQuickRefresh = async () => {
+    setLoading(true);
+    setError(null);
+    clearQuickCache(); // Keep daily scan, clear structure data
+
+    setPipelineProgress({
+      task: 'Initializing',
+      status: 'starting',
+      progress: 0,
+      message: 'Quick refresh (using cached universe)...',
+    });
+
+    try {
+      const state = await runAgentPipeline({
+        equity: accountEquity,
+        cash: accountEquity,
+        forceRefresh: false, // Use cached daily scan
+        onProgress: (progress) => {
+          console.log('[Dashboard] Quick Progress:', progress.task, progress.progress + '%');
+          setPipelineProgress(() => ({ ...progress }));
+        },
+      });
+      setAgentState(state);
+    } catch (err) {
+      console.error("Pipeline error:", err);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Convert permissions for MarketStateStrip
   const permissions: MarketPermissions = agentState?.marketState.permissions
     ? {
@@ -2676,6 +2708,7 @@ export default function TradingAgentDashboard() {
         stateLabel={stateLabel}
         permissions={permissions}
         onEodRefresh={handleEodRefresh}
+        onQuickRefresh={handleQuickRefresh}
       />
 
       {loading ? (
