@@ -2501,17 +2501,19 @@ export default function TradingAgentDashboard() {
   // Helper to refresh portfolio after trade execution
   const refreshPortfolio = async () => {
     try {
-      // Calculate cash as equity - invested
-      const invested = agentState?.portfolio?.positions?.reduce((acc, p) => acc + (p.value ?? 0), 0) ?? 0;
-      const cash = accountEquity - invested;
+      console.log('[Dashboard] Refreshing portfolio and trades...');
+      const { portfolio, overview } = await refreshPortfolioOnly(accountEquity, accountEquity);
+      console.log('[Dashboard] Got updated data:', portfolio.positions.length, 'positions,', overview.trades_today.length, 'trades');
 
-      const updatedPortfolio = await refreshPortfolioOnly(accountEquity, cash);
-      if (agentState) {
-        setAgentState({
-          ...agentState,
-          portfolio: updatedPortfolio,
-        });
-      }
+      // Use functional update to avoid stale closure
+      setAgentState(prevState => {
+        if (!prevState) return prevState;
+        return {
+          ...prevState,
+          portfolio,
+          overview,
+        };
+      });
     } catch (err) {
       console.error('[Dashboard] Failed to refresh portfolio:', err);
     }
@@ -2570,13 +2572,18 @@ export default function TradingAgentDashboard() {
 
   // Add Trade handler - creates new position or adds to existing
   const handleAddTrade = async (trade: TradeInput) => {
+    console.log('[Dashboard] Saving trade:', trade);
     const result = await saveTradeToDatabase(trade);
+    console.log('[Dashboard] Trade saved result:', result);
+
     if (!result) {
-      throw new Error('Failed to save trade');
+      throw new Error('Failed to save trade - check if Supabase is configured');
     }
 
     // Refresh portfolio after successful trade
+    console.log('[Dashboard] Trade saved, refreshing portfolio...');
     await refreshPortfolio();
+    console.log('[Dashboard] Portfolio refresh complete');
   };
 
   // Equity editing handlers

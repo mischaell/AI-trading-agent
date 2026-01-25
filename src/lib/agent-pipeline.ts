@@ -1898,21 +1898,28 @@ export async function saveTradeToDatabase(trade: TradeInput): Promise<TradeRow |
 }
 
 /**
- * Refresh only the portfolio data from database
- * Used after trim/sell operations to update the UI without re-running the full pipeline
+ * Refresh only the portfolio and trades data from database
+ * Used after trade operations to update the UI without re-running the full pipeline
  *
  * @param equity - Account equity for calculations
  * @param cash - Account cash for calculations
- * @returns Updated PortfolioOutput
+ * @returns Updated PortfolioOutput and OverviewOutput
  */
-export async function refreshPortfolioOnly(equity: number = 100000, cash: number = 50000): Promise<PortfolioOutput> {
+export async function refreshPortfolioOnly(
+  equity: number = 100000,
+  cash: number = 50000
+): Promise<{ portfolio: PortfolioOutput; overview: OverviewOutput }> {
   const mockAccount: AccountContext = { equity, cash };
 
   const positions = await loadPositionsFromDatabase();
   const recentTrades = await loadRecentTradesFromDatabase();
   const portfolio = calculatePortfolio(positions, recentTrades, mockAccount);
 
-  console.log(`[Pipeline] Portfolio refreshed: ${positions.length} positions`);
+  // Also load trades for Trades Today view
+  const tradeFills = await loadTradeFillsFromDatabase(24);
+  const overview = generateOverview(tradeFills, { lookback_hours: 24 });
 
-  return portfolio;
+  console.log(`[Pipeline] Refreshed: ${positions.length} positions, ${tradeFills.length} trades`);
+
+  return { portfolio, overview };
 }
