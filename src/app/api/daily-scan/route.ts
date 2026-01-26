@@ -55,17 +55,21 @@ const CHINA_KEYWORDS = ['china', 'chinese', 'hong kong', 'adr'];
 function isExcludedByName(name: string): { excluded: boolean; reason?: string } {
   const nameLower = name.toLowerCase();
 
-  // Check China ADR
+  // Check China ADR - always exclude
   if (CHINA_KEYWORDS.some(k => nameLower.includes(k))) {
     return { excluded: true, reason: 'China/HK ADR' };
   }
 
-  // Check excluded sectors
-  for (const keyword of EXCLUDED_SECTORS_KEYWORDS) {
-    if (nameLower.includes(keyword)) {
-      return { excluded: true, reason: `Excluded sector (${keyword})` };
-    }
-  }
+  // AGGRESSIVE MODE: Skip sector exclusions to include industrials, financials, crypto miners etc.
+  // Original excluded: biotech, energy, utilities, REITs, banks, mining, healthcare
+  // Now we only exclude China ADRs
+  //
+  // Uncomment below to restore sector exclusions:
+  // for (const keyword of EXCLUDED_SECTORS_KEYWORDS) {
+  //   if (nameLower.includes(keyword)) {
+  //     return { excluded: true, reason: `Excluded sector (${keyword})` };
+  //   }
+  // }
 
   return { excluded: false };
 }
@@ -214,40 +218,59 @@ export async function POST() {
   console.log('[DailyScan] Starting full Nasdaq universe scan...');
 
   try {
-    // Step 1: Fetch full Nasdaq ticker list
-    console.log('[DailyScan] Step 1: Fetching Nasdaq ticker list...');
+    // Step 1: Fetch NASDAQ + NYSE ticker lists
+    console.log('[DailyScan] Step 1: Fetching NASDAQ + NYSE ticker lists...');
 
-    const nasdaqResponse = await fetch(
-      'https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=5000&exchange=NASDAQ',
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        },
+    const fetchExchange = async (exchange: 'NASDAQ' | 'NYSE') => {
+      const response = await fetch(
+        `https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=5000&exchange=${exchange}`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          },
+        }
+      );
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (data?.data?.table?.rows || []).map((s: { symbol: string; name: string; marketCap: string; lastsale: string }) => ({
+        ...s,
+        exchange,
+      }));
+    };
+
+    // Fetch both exchanges in parallel
+    const [nasdaqRaw, nyseRaw] = await Promise.all([
+      fetchExchange('NASDAQ'),
+      fetchExchange('NYSE'),
+    ]);
+
+    console.log(`[DailyScan] Raw: NASDAQ=${nasdaqRaw.length}, NYSE=${nyseRaw.length}`);
+
+    // Combine and dedupe
+    const seen = new Set<string>();
+    const allStocks: Array<{ symbol: string; name: string; marketCap: string; lastsale: string; exchange: string }> = [];
+    for (const s of [...nasdaqRaw, ...nyseRaw]) {
+      if (!seen.has(s.symbol)) {
+        seen.add(s.symbol);
+        allStocks.push(s);
       }
-    );
-
-    if (!nasdaqResponse.ok) {
-      throw new Error(`Nasdaq API returned ${nasdaqResponse.status}`);
     }
 
-    const nasdaqData = await nasdaqResponse.json();
-    const nasdaqStocks = nasdaqData?.data?.table?.rows || [];
-
     // Pre-filter by market cap and price
-    const preFiltered: NasdaqStock[] = nasdaqStocks
-      .filter((s: { marketCap: string; lastsale: string }) => {
+    const preFiltered: NasdaqStock[] = allStocks
+      .filter((s) => {
         const marketCap = parseInt(s.marketCap?.replace(/,/g, '') || '0', 10);
         const price = parseFloat(s.lastsale?.replace(/[$,]/g, '') || '0');
         return marketCap >= 500_000_000 && price >= 5;
       })
-      .map((s: { symbol: string; name: string; marketCap: string; lastsale: string }) => ({
+      .map((s) => ({
         ticker: s.symbol,
         name: s.name,
         marketCap: parseInt(s.marketCap?.replace(/,/g, '') || '0', 10),
         lastSale: parseFloat(s.lastsale?.replace(/[$,]/g, '') || '0'),
       }));
 
-    console.log(`[DailyScan] Got ${nasdaqStocks.length} stocks, pre-filtered to ${preFiltered.length}`);
+    console.log(`[DailyScan] Combined ${allStocks.length} stocks, pre-filtered to ${preFiltered.length}`);
 
     // Step 2: Filter out excluded sectors by name
     console.log('[DailyScan] Step 2: Filtering by company name...');
@@ -300,43 +323,44 @@ export async function POST() {
     console.log('[DailyScan] Step 4: Calculating RS rankings...');
     calculateRSRankings(allData);
 
-    // Step 5: Apply Liquid Leaders filters
-    console.log('[DailyScan] Step 5: Applying Liquid Leaders filters...');
+    // Step 5: Apply Liquid Leaders filters (AGGRESSIVE criteria)
+    // These are relaxed to include industrials, financials, crypto miners etc.
+    console.log('[DailyScan] Step 5: Applying Liquid Leaders filters (aggressive)...');
 
     const passed: FilteredStock[] = [];
 
     for (const stock of allData) {
-      // Filter: Liquidity >= $250M
-      if (stock.liquidityM < 250) {
-        failed.push({ ticker: stock.ticker, reason: `Liquidity $${stock.liquidityM.toFixed(0)}M < $250M` });
+      // Filter: Liquidity >= $100M (aggressive: was $250M)
+      if (stock.liquidityM < 100) {
+        failed.push({ ticker: stock.ticker, reason: `Liquidity $${stock.liquidityM.toFixed(0)}M < $100M` });
         continue;
       }
 
-      // Filter: Volume >= 1M shares
-      if (stock.volumeM < 1) {
-        failed.push({ ticker: stock.ticker, reason: `Volume ${stock.volumeM.toFixed(2)}M < 1M shares` });
+      // Filter: Volume >= 0.5M shares (aggressive: was 1M)
+      if (stock.volumeM < 0.5) {
+        failed.push({ ticker: stock.ticker, reason: `Volume ${stock.volumeM.toFixed(2)}M < 0.5M shares` });
         continue;
       }
 
-      // Filter: Market Cap >= $1B
-      if (stock.marketCapB < 1) {
-        failed.push({ ticker: stock.ticker, reason: `Market cap $${stock.marketCapB.toFixed(1)}B < $1B` });
+      // Filter: Market Cap >= $0.5B (aggressive: was $1B)
+      if (stock.marketCapB < 0.5) {
+        failed.push({ ticker: stock.ticker, reason: `Market cap $${stock.marketCapB.toFixed(1)}B < $0.5B` });
         continue;
       }
 
-      // Filter: ADR between 2.5% and 10%
-      if (stock.adrPct < 2.5) {
-        failed.push({ ticker: stock.ticker, reason: `ADR ${stock.adrPct.toFixed(2)}% < 2.5%` });
+      // Filter: ADR between 2.0% and 20% (aggressive: was 2.5%-10%)
+      if (stock.adrPct < 2.0) {
+        failed.push({ ticker: stock.ticker, reason: `ADR ${stock.adrPct.toFixed(2)}% < 2.0%` });
         continue;
       }
-      if (stock.adrPct > 10) {
-        failed.push({ ticker: stock.ticker, reason: `ADR ${stock.adrPct.toFixed(2)}% > 10%` });
+      if (stock.adrPct > 20) {
+        failed.push({ ticker: stock.ticker, reason: `ADR ${stock.adrPct.toFixed(2)}% > 20%` });
         continue;
       }
 
-      // Filter: Price > $10
-      if (stock.price < 10) {
-        failed.push({ ticker: stock.ticker, reason: `Price $${stock.price.toFixed(2)} < $10` });
+      // Filter: Price > $5 (aggressive: was $10)
+      if (stock.price < 5) {
+        failed.push({ ticker: stock.ticker, reason: `Price $${stock.price.toFixed(2)} < $5` });
         continue;
       }
 
@@ -347,12 +371,12 @@ export async function POST() {
     // Sort by RS (highest first)
     passed.sort((a, b) => b.rs - a.rs);
 
-    // Limit to top 40
-    const liquidLeaders = passed.slice(0, 40);
+    // Limit to top 75 (aggressive mode - was 40)
+    const liquidLeaders = passed.slice(0, 75);
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[DailyScan] Complete in ${elapsed}s`);
-    console.log(`[DailyScan] Scanned: ${nameFiltered.length}, Got data: ${allData.length}, Passed: ${passed.length}, Top 40: ${liquidLeaders.length}`);
+    console.log(`[DailyScan] Scanned: ${nameFiltered.length}, Got data: ${allData.length}, Passed: ${passed.length}, Top ${liquidLeaders.length}`);
 
     // Build failure summary
     const failureReasons: Record<string, number> = {};
