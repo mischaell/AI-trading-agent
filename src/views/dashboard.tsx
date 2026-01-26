@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -2448,6 +2449,12 @@ function ViewPortfolio({
               </span>
             </div>
           </div>
+          <a
+            href="/simulator"
+            className="mt-3 block w-full rounded-lg bg-blue-600 py-2 text-center text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            Open Simulator &rarr;
+          </a>
         </CardContent>
       </Card>
 
@@ -2491,6 +2498,12 @@ function ViewPortfolio({
             <Pill tone={toneForPnl(totals.totalRealized)}>
               Secured <span className="font-bold">{totals.totalRealized >= 0 ? '+' : ''}{((totals.totalRealized / accountEquity) * 100).toFixed(2)}%</span>
             </Pill>
+            <a
+              href="/simulator"
+              className="ml-auto flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              Simulator &rarr;
+            </a>
           </div>
         </CardContent>
       </Card>
@@ -2499,11 +2512,18 @@ function ViewPortfolio({
       <Card className="mt-4 rounded-2xl shadow-sm">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm">Open Positions</CardTitle>
-          {onAddTrade && (
-            <Button size="sm" onClick={onAddTrade} className="h-7 text-xs">
-              + Add Trade
-            </Button>
-          )}
+          <div className="flex gap-2">
+            <Link href="/simulator">
+              <Button size="sm" variant="outline" className="h-7 text-xs">
+                Simulator
+              </Button>
+            </Link>
+            {onAddTrade && (
+              <Button size="sm" onClick={onAddTrade} className="h-7 text-xs">
+                + Add Trade
+              </Button>
+            )}
+          </div>
         </CardHeader>
 
         <CardContent>

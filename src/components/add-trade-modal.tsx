@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { PortfolioPosition } from "@/types";
 import { TradeInput } from "@/lib/agent-pipeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { fetchOHLC } from "@/lib/market-data/client";
 
 // =============================================================================
 // Types
@@ -35,16 +36,18 @@ export function AddTradeModal({
   // Form state
   const [tradeType, setTradeType] = useState<TradeType>("ENTRY");
   const [ticker, setTicker] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [shares, setShares] = useState<number>(0);
   const [amount, setAmount] = useState<number>(0);
-  const [entryPrice, setEntryPrice] = useState<number>(0);
   const [ssl, setSsl] = useState<number>(0);
   const [mode, setMode] = useState<Mode>("MODE1");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const [isFetchingPrice, setIsFetchingPrice] = useState(false);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const tickerInputRef = useRef<HTMLInputElement>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check if ticker exists in portfolio
   const existingPosition = useMemo(() => {
@@ -55,39 +58,82 @@ export function AddTradeModal({
 
   // Auto-calculated values
   const calculated = useMemo(() => {
-    if (entryPrice <= 0 || amount <= 0) {
-      return { shares: 0, riskPerShare: 0, trim2r: 0, positionPct: 0 };
+    if (shares <= 0 || amount <= 0) {
+      return { entryPrice: 0, riskPerShare: 0, trim2r: 0, positionPct: 0, totalRisk: 0, gainLoss: 0, gainLossPct: 0 };
     }
 
-    const shares = Math.floor(amount / entryPrice);
+    const entryPrice = amount / shares;
     const riskPerShare = ssl > 0 ? entryPrice - ssl : 0;
     const trim2r = riskPerShare > 0 ? entryPrice + 2 * riskPerShare : 0;
     const positionPct = equity > 0 ? (amount / equity) * 100 : 0;
+    const totalRisk = riskPerShare * shares;
 
-    return { shares, riskPerShare, trim2r, positionPct };
-  }, [amount, entryPrice, ssl, equity]);
+    // Calculate gain/loss vs current price
+    const gainLoss = currentPrice > 0 ? (currentPrice - entryPrice) * shares : 0;
+    const gainLossPct = currentPrice > 0 && entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0;
+
+    return { entryPrice, riskPerShare, trim2r, positionPct, totalRisk, gainLoss, gainLossPct };
+  }, [shares, amount, ssl, equity, currentPrice]);
+
+  // Fetch current price when ticker changes (with debounce)
+  const fetchCurrentPrice = useCallback(async (tickerSymbol: string) => {
+    if (!tickerSymbol || tickerSymbol.length < 1) return;
+
+    setIsFetchingPrice(true);
+    setCurrentPrice(0);
+
+    try {
+      const ohlcData = await fetchOHLC(tickerSymbol.toUpperCase(), 5);
+      if (ohlcData && ohlcData.length > 0) {
+        const lastDay = ohlcData[ohlcData.length - 1];
+        setCurrentPrice(lastDay.close);
+      }
+    } catch (err) {
+      console.error("Failed to fetch price:", err);
+    } finally {
+      setIsFetchingPrice(false);
+    }
+  }, []);
+
+  // Debounced ticker change handler
+  const handleTickerChange = useCallback((newTicker: string) => {
+    const upperTicker = newTicker.toUpperCase();
+    setTicker(upperTicker);
+
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    if (upperTicker.length >= 1) {
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchCurrentPrice(upperTicker);
+      }, 500);
+    }
+  }, [fetchCurrentPrice]);
 
   // Reset form when modal opens and lock body scroll
   useEffect(() => {
     if (isOpen) {
-      // Lock body scroll
       document.body.style.overflow = "hidden";
 
       setTradeType("ENTRY");
       setTicker("");
-      setDate(new Date().toISOString().split("T")[0]);
+      setShares(0);
       setAmount(0);
-      setEntryPrice(0);
       setSsl(0);
       setMode("MODE1");
       setIsSubmitting(false);
       setError(null);
+      setCurrentPrice(0);
+      setIsFetchingPrice(false);
       setTimeout(() => tickerInputRef.current?.focus(), 100);
     }
 
     return () => {
-      // Restore body scroll on unmount
       document.body.style.overflow = "";
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
     };
   }, [isOpen]);
 
@@ -113,11 +159,11 @@ export function AddTradeModal({
   // Validation
   const validate = (): string | null => {
     if (!ticker.trim()) return "Ticker is required";
+    if (shares <= 0) return "Shares must be positive";
     if (amount <= 0) return "Amount must be positive";
-    if (entryPrice <= 0) return "Entry price must be positive";
+    if (calculated.entryPrice <= 0) return "Could not calculate entry price";
     if (ssl <= 0) return "SSL (stop loss) is required";
-    if (ssl >= entryPrice) return "SSL must be below entry price";
-    if (calculated.shares <= 0) return "Amount too small for even 1 share";
+    if (ssl >= calculated.entryPrice) return "SSL must be below entry price";
 
     if (tradeType === "ADD" && !existingPosition) {
       return `No existing position for ${ticker.toUpperCase()}. Use ENTRY instead.`;
@@ -146,8 +192,8 @@ export function AddTradeModal({
         ticker: ticker.toUpperCase(),
         side: "BUY",
         action_type: tradeType,
-        shares: calculated.shares,
-        price: entryPrice,
+        shares: shares,
+        price: calculated.entryPrice,
         ssl: ssl,
         trim_2r_price: calculated.trim2r,
         mode: mode,
@@ -231,11 +277,19 @@ export function AddTradeModal({
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700">
               Ticker
+              {currentPrice > 0 && (
+                <span className="ml-2 font-normal text-green-600">
+                  Current: ${currentPrice.toFixed(2)}
+                </span>
+              )}
             </label>
             {tradeType === "ADD" ? (
               <select
                 value={ticker}
-                onChange={(e) => setTicker(e.target.value)}
+                onChange={(e) => {
+                  setTicker(e.target.value);
+                  if (e.target.value) fetchCurrentPrice(e.target.value);
+                }}
                 className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs font-mono ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <option value="">Select position...</option>
@@ -251,10 +305,15 @@ export function AddTradeModal({
                   ref={tickerInputRef}
                   type="text"
                   value={ticker}
-                  onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                  onChange={(e) => handleTickerChange(e.target.value)}
                   placeholder="e.g., NVDA"
                   className="h-7 text-xs font-mono uppercase"
                 />
+                {isFetchingPrice && (
+                  <p className="mt-0.5 text-[10px] text-blue-600">
+                    Fetching current price...
+                  </p>
+                )}
                 {ticker && existingPosition && (
                   <p className="mt-0.5 text-[10px] text-amber-600">
                     Position exists - consider using ADD
@@ -264,15 +323,16 @@ export function AddTradeModal({
             )}
           </div>
 
-          {/* Date */}
+          {/* Shares */}
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700">
-              Date
+              Shares
             </label>
             <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              type="number"
+              value={shares || ""}
+              onChange={(e) => setShares(Math.max(0, Math.floor(Number(e.target.value))))}
+              placeholder="e.g., 100"
               className="h-7 text-xs font-mono"
             />
           </div>
@@ -287,21 +347,6 @@ export function AddTradeModal({
               value={amount || ""}
               onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
               placeholder="e.g., 10000"
-              className="h-7 text-xs font-mono"
-            />
-          </div>
-
-          {/* Entry Price */}
-          <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-700">
-              Entry Price ($)
-            </label>
-            <Input
-              type="number"
-              step="0.01"
-              value={entryPrice || ""}
-              onChange={(e) => setEntryPrice(Math.max(0, Number(e.target.value)))}
-              placeholder="e.g., 140.50"
               className="h-7 text-xs font-mono"
             />
           </div>
@@ -351,34 +396,50 @@ export function AddTradeModal({
           )}
 
           {/* Calculated Values */}
-          {calculated.shares > 0 && (
+          {calculated.entryPrice > 0 && (
             <div className="rounded-lg bg-zinc-50 p-2 space-y-1">
               <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">
                 Calculated
               </div>
               <div className="grid grid-cols-2 gap-1 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Shares:</span>
+                  <span className="text-zinc-500">Entry Price:</span>
                   <span className="font-mono font-medium text-zinc-900">
-                    {calculated.shares}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Risk/Share:</span>
-                  <span className="font-mono font-medium text-zinc-900">
-                    ${calculated.riskPerShare.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">2R Target:</span>
-                  <span className="font-mono font-medium text-green-600">
-                    ${calculated.trim2r.toFixed(2)}
+                    ${calculated.entryPrice.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Position %:</span>
                   <span className="font-mono font-medium text-zinc-900">
                     {calculated.positionPct.toFixed(1)}%
+                  </span>
+                </div>
+                {currentPrice > 0 && (
+                  <>
+                    <div className="flex justify-between col-span-2 pt-1 border-t border-zinc-200">
+                      <span className="text-zinc-500">Current vs Entry:</span>
+                      <span className={`font-mono font-medium ${calculated.gainLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {calculated.gainLoss >= 0 ? "+" : ""}${calculated.gainLoss.toFixed(0)} ({calculated.gainLossPct >= 0 ? "+" : ""}{calculated.gainLossPct.toFixed(1)}%)
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Risk/Share:</span>
+                  <span className="font-mono font-medium text-red-600">
+                    ${calculated.riskPerShare.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Total Risk:</span>
+                  <span className="font-mono font-medium text-red-600">
+                    ${calculated.totalRisk.toFixed(0)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">2R Target:</span>
+                  <span className="font-mono font-medium text-green-600">
+                    ${calculated.trim2r.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -401,12 +462,12 @@ export function AddTradeModal({
           <Button
             size="sm"
             onClick={handleConfirm}
-            disabled={isSubmitting || calculated.shares <= 0}
+            disabled={isSubmitting || shares <= 0 || amount <= 0}
             className="h-7 text-xs"
           >
             {isSubmitting
               ? "Adding..."
-              : `Add ${tradeType} (${calculated.shares} shares)`}
+              : `Add ${tradeType} (${shares} @ $${calculated.entryPrice.toFixed(2)})`}
           </Button>
         </div>
       </div>
