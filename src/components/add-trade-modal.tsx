@@ -69,9 +69,14 @@ export function AddTradeModal({
     }
 
     const entryPrice = amount / shares;
-    // SSL must be below entry price for valid risk calculation
-    const riskPerShare = ssl > 0 && ssl < entryPrice ? entryPrice - ssl : 0;
-    const trim2r = riskPerShare > 0 ? entryPrice + 2 * riskPerShare : 0;
+    // Risk calculation (negative if trailing SSL above entry = locked in profit)
+    const riskPerShare = ssl > 0 ? entryPrice - ssl : 0;
+    // 2R target: for normal stops, entry + 2R. For trailing stops (SSL > entry), use SSL + 2*(SSL - entry)
+    const trim2r = ssl > 0
+      ? (riskPerShare > 0
+          ? entryPrice + 2 * riskPerShare  // Normal: entry + 2R
+          : ssl + 2 * Math.abs(riskPerShare))  // Trailing: SSL + 2*(locked profit)
+      : 0;
     const positionPct = equity > 0 ? (amount / equity) * 100 : 0;
     const totalRisk = riskPerShare * shares;
 
@@ -209,7 +214,6 @@ export function AddTradeModal({
     if (amount <= 0) return "Amount must be positive";
     if (calculated.entryPrice <= 0) return "Could not calculate entry price";
     if (ssl <= 0) return "SSL (stop loss) is required";
-    if (ssl >= calculated.entryPrice) return "SSL must be below entry price";
 
     if (tradeType === "ADD" && !existingPosition) {
       return `No existing position for ${ticker.toUpperCase()}. Use ENTRY instead.`;
@@ -246,7 +250,9 @@ export function AddTradeModal({
         notes: `Manual ${tradeType} via Add Trade modal. Amount: $${amount.toLocaleString()}`,
       };
 
+      console.log('[AddTradeModal] Submitting trade:', JSON.stringify(trade, null, 2));
       await onConfirm(trade);
+      console.log('[AddTradeModal] Trade submitted successfully');
       onClose();
     } catch (err) {
       console.error("Failed to execute trade:", err);
@@ -461,11 +467,11 @@ export function AddTradeModal({
             <p className="mt-0.5 text-[10px] text-zinc-400">
               {suggestedSsl > 0
                 ? "EMA21 low = losing current structure"
-                : "Price per share where you'd exit (must be below entry)"}
+                : "Stop price (can be above entry for trailing stop)"}
             </p>
-            {ssl > 0 && calculated.entryPrice > 0 && ssl >= calculated.entryPrice && (
-              <p className="mt-0.5 text-[10px] text-red-500 font-medium">
-                SSL must be below entry price (${calculated.entryPrice.toFixed(2)})
+            {ssl > 0 && calculated.entryPrice > 0 && ssl > calculated.entryPrice && (
+              <p className="mt-0.5 text-[10px] text-green-600 font-medium">
+                Trailing stop: ${(ssl - calculated.entryPrice).toFixed(2)} profit locked in
               </p>
             )}
           </div>
@@ -528,11 +534,11 @@ export function AddTradeModal({
                     </div>
                   </>
                 )}
-                {calculated.riskPerShare > 0 ? (
+                {calculated.riskPerShare !== 0 ? (
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Risk/Share:</span>
-                    <span className="font-mono font-medium text-red-600">
-                      ${calculated.riskPerShare.toFixed(2)}
+                    <span className="text-zinc-500">{calculated.riskPerShare > 0 ? "Risk/Share:" : "Locked/Share:"}</span>
+                    <span className={`font-mono font-medium ${calculated.riskPerShare > 0 ? "text-red-600" : "text-green-600"}`}>
+                      ${Math.abs(calculated.riskPerShare).toFixed(2)}
                     </span>
                   </div>
                 ) : (
@@ -541,11 +547,11 @@ export function AddTradeModal({
                     <span className="font-mono text-zinc-400">Set SSL</span>
                   </div>
                 )}
-                {calculated.riskPerShare > 0 ? (
+                {calculated.riskPerShare !== 0 ? (
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Total Risk:</span>
-                    <span className="font-mono font-medium text-red-600">
-                      ${calculated.totalRisk.toFixed(0)}
+                    <span className="text-zinc-500">{calculated.totalRisk > 0 ? "Total Risk:" : "Locked Profit:"}</span>
+                    <span className={`font-mono font-medium ${calculated.totalRisk > 0 ? "text-red-600" : "text-green-600"}`}>
+                      ${Math.abs(calculated.totalRisk).toFixed(0)}
                     </span>
                   </div>
                 ) : (

@@ -1936,10 +1936,17 @@ export async function saveTradeToDatabase(trade: TradeInput): Promise<TradeRow |
         };
 
         try {
+          console.log(`[Pipeline] Creating position:`, JSON.stringify(positionInsert, null, 2));
           await upsertPosition(positionInsert);
           console.log(`[Pipeline] Position created for ${trade.ticker}`);
-        } catch (posError) {
-          console.error(`[Pipeline] Failed to create position for ${trade.ticker}:`, posError);
+        } catch (posError: unknown) {
+          const err = posError as { message?: string; code?: string; details?: string };
+          console.error(`[Pipeline] Failed to create position for ${trade.ticker}:`, {
+            message: err.message,
+            code: err.code,
+            details: err.details,
+            fullError: posError,
+          });
           // Don't fail the trade save if position creation fails
         }
       }
