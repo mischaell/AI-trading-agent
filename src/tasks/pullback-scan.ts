@@ -64,7 +64,7 @@ export interface PullbackTickerData extends UniverseLeader {
 /**
  * Sort method for pullback candidates
  */
-export type PullbackSortMethod = 'backtest_score' | 'one_day_rs' | 'ibd_rs';
+export type PullbackSortMethod = 'backtest_score' | 'one_day_rs' | 'ibd_rs' | 'ibd_rs_asc';
 
 /**
  * Pullback filter criteria
@@ -162,6 +162,26 @@ export const AGGRESSIVE_PULLBACK_CRITERIA: Required<PullbackFilterCriteria> = {
   require_advancing_10wma: false,
   target_count: { min: 30, max: 75 }, // Target 30-75 candidates
   sort_by: 'one_day_rs',        // Sort by 1-day RS for momentum ranking
+};
+
+/**
+ * Strict pullback criteria - "Liquid Leaders 21DMA Structure Pullback"
+ * Stocks sitting on support, not extended, with structure intact
+ * Use with DEFAULT_UNIVERSE_CRITERIA (with sector exclusions)
+ */
+export const STRICT_PULLBACK_CRITERIA: Required<PullbackFilterCriteria> = {
+  min_dist_21_atr: 0,           // At or above 21EMA (not below)
+  max_dist_21_atr: 1.1,         // Not extended: max 1.1 ATR above
+  min_dist_50_atr: -0.5,        // Not broken below 50EMA
+  max_dist_50_atr: 4.0,         // Max 4 ATR above 50EMA
+  min_close_range_pct: 10,      // Close in upper 90% of range
+  require_contraction: true,    // Must be contracting (5d < 80% of 20d)
+  max_weekly_return_pct: 15,    // Not chasing: < 15% weekly gain
+  min_earnings_days: 7,         // Earnings 7+ days out
+  require_advancing_21ema: true,  // 21EMA must be rising
+  require_advancing_10wma: false, // 10WMA not required (only 21EMA)
+  target_count: { min: 5, max: 15 }, // Target 5-15 tight setups
+  sort_by: 'ibd_rs_asc',        // Sort by RS ascending (lowest RS first - contrarian)
 };
 
 /**
@@ -604,6 +624,22 @@ function sortByIBDRS(
 }
 
 /**
+ * Sort candidates by IBD RS ASCENDING (lower RS first)
+ * Contrarian approach - find pullbacks in less crowded names
+ */
+function sortByIBDRSAsc(
+  candidates: Array<{ data: PullbackTickerData; result: PullbackFilterResult }>
+): Array<{ data: PullbackTickerData; result: PullbackFilterResult }> {
+  return [...candidates].sort((a, b) => {
+    // Primary: IBD RS (lower first - ascending)
+    if (a.data.rs !== b.data.rs) return a.data.rs - b.data.rs;
+
+    // Secondary: distance to 21EMA (tighter first)
+    return Math.abs(a.data.dist_21ema_atr) - Math.abs(b.data.dist_21ema_atr);
+  });
+}
+
+/**
  * Sort candidates by specified method
  */
 function sortCandidates(
@@ -615,6 +651,8 @@ function sortCandidates(
       return sortByOneDayRS(candidates);
     case 'ibd_rs':
       return sortByIBDRS(candidates);
+    case 'ibd_rs_asc':
+      return sortByIBDRSAsc(candidates);
     case 'backtest_score':
     default:
       return sortByBacktestScore(candidates);
@@ -818,6 +856,7 @@ export {
   sortCandidates,
   sortByOneDayRS,
   sortByIBDRS,
+  sortByIBDRSAsc,
   sortByBacktestScore,
   toPullbackCandidate,
   determineStructurePosition,
