@@ -48,6 +48,7 @@ export function AddTradeModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const [suggestedSsl, setSuggestedSsl] = useState<number>(0);
   const [isFetchingPrice, setIsFetchingPrice] = useState(false);
 
   const modalRef = useRef<HTMLDivElement>(null);
@@ -81,25 +82,45 @@ export function AddTradeModal({
     return { entryPrice, riskPerShare, trim2r, positionPct, totalRisk, gainLoss, gainLossPct };
   }, [shares, amount, ssl, equity, currentPrice]);
 
-  // Fetch current price when ticker changes (with debounce)
+  // Calculate EMA from array of values
+  const calculateEMA = useCallback((values: number[], period: number): number => {
+    if (values.length < period) return 0;
+    const k = 2 / (period + 1);
+    let ema = values.slice(0, period).reduce((a, b) => a + b, 0) / period; // SMA for first period
+    for (let i = period; i < values.length; i++) {
+      ema = values[i] * k + ema * (1 - k);
+    }
+    return ema;
+  }, []);
+
+  // Fetch current price and EMA21 when ticker changes (with debounce)
   const fetchCurrentPrice = useCallback(async (tickerSymbol: string) => {
     if (!tickerSymbol || tickerSymbol.length < 1) return;
 
     setIsFetchingPrice(true);
     setCurrentPrice(0);
+    setSuggestedSsl(0);
 
     try {
-      const ohlcData = await fetchOHLC(tickerSymbol.toUpperCase(), 5);
+      // Fetch 35 days for EMA21 calculation
+      const ohlcData = await fetchOHLC(tickerSymbol.toUpperCase(), 35);
       if (ohlcData && ohlcData.length > 0) {
         const lastDay = ohlcData[ohlcData.length - 1];
         setCurrentPrice(lastDay.close);
+
+        // Calculate EMA21 of lows (losing this = losing structure)
+        if (ohlcData.length >= 21) {
+          const lows = ohlcData.map(d => d.low);
+          const ema21Low = calculateEMA(lows, 21);
+          setSuggestedSsl(ema21Low);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch price:", err);
     } finally {
       setIsFetchingPrice(false);
     }
-  }, []);
+  }, [calculateEMA]);
 
   // Debounced ticker change handler
   const handleTickerChange = useCallback((newTicker: string) => {
@@ -148,6 +169,7 @@ export function AddTradeModal({
       setIsSubmitting(false);
       setError(null);
       setCurrentPrice(0);
+      setSuggestedSsl(0);
       setIsFetchingPrice(false);
       fetchForexRate();
       setTimeout(() => tickerInputRef.current?.focus(), 100);
@@ -415,16 +437,31 @@ export function AddTradeModal({
                 </span>
               )}
             </label>
-            <Input
-              type="number"
-              step="0.01"
-              value={ssl || ""}
-              onChange={(e) => setSsl(Math.max(0, Number(e.target.value)))}
-              placeholder={calculated.entryPrice > 0 ? `e.g., ${(calculated.entryPrice * 0.95).toFixed(2)}` : "e.g., 175.00"}
-              className="h-7 text-xs font-mono"
-            />
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                step="0.01"
+                value={ssl || ""}
+                onChange={(e) => setSsl(Math.max(0, Number(e.target.value)))}
+                placeholder={suggestedSsl > 0 ? suggestedSsl.toFixed(2) : "e.g., 175.00"}
+                className="h-7 text-xs font-mono flex-1"
+              />
+              {suggestedSsl > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSsl(Math.round(suggestedSsl * 100) / 100)}
+                  className="h-7 text-[10px] px-2 whitespace-nowrap"
+                >
+                  Use EMA21: ${suggestedSsl.toFixed(2)}
+                </Button>
+              )}
+            </div>
             <p className="mt-0.5 text-[10px] text-zinc-400">
-              Price per share where you&apos;d exit (must be below entry)
+              {suggestedSsl > 0
+                ? "EMA21 low = losing current structure"
+                : "Price per share where you'd exit (must be below entry)"}
             </p>
             {ssl > 0 && calculated.entryPrice > 0 && ssl >= calculated.entryPrice && (
               <p className="mt-0.5 text-[10px] text-red-500 font-medium">
