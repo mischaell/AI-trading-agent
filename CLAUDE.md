@@ -61,6 +61,27 @@ Before making changes to market state, position sizing, or trading logic, **alwa
 3. **Market State**: QQQE above structure should never return PARTICIPATION_FADE
 4. **Reclaim Scenario**: Below cloud + rising slope (higher low) = EARLY_CONFIRMATION
 
+## Development Rules
+
+### Third-Party Data Sources
+
+When calling data from third-party sources through APIs, MCP servers, batch processes, or other external means:
+
+1. **Always test that data is received and processed correctly** - Never assume the call succeeded
+2. **Never silently fall back to default values** - If a fallback is used, it must be clearly highlighted to the user
+3. **Log failures explicitly** - Console errors are not enough; surface the issue in the UI when relevant
+4. **Validate response structure** - Check that expected fields exist before using them
+5. **Show data freshness** - Display when data was last updated (e.g., "Live rate" vs "Cached" vs "Fallback")
+
+Example pattern:
+```typescript
+const response = await fetch(externalAPI);
+if (!response.ok) throw new Error(`API returned ${response.status}`);
+const data = await response.json();
+if (!data.expectedField) throw new Error("Invalid response structure");
+// Only now use the data
+```
+
 ## Testing
 
 ```bash

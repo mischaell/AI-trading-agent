@@ -33,11 +33,16 @@ export function AddTradeModal({
   existingPositions,
   equity,
 }: AddTradeModalProps) {
+  // GBP to USD exchange rate (fetched from API, updated every 24h)
+  const [gbpToUsd, setGbpToUsd] = useState<number>(1.27);
+  const [rateLoading, setRateLoading] = useState(false);
+
   // Form state
   const [tradeType, setTradeType] = useState<TradeType>("ENTRY");
   const [ticker, setTicker] = useState("");
   const [shares, setShares] = useState<number>(0);
   const [amount, setAmount] = useState<number>(0);
+  const [amountGBP, setAmountGBP] = useState<number>(0);
   const [ssl, setSsl] = useState<number>(0);
   const [mode, setMode] = useState<Mode>("MODE1");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,7 +68,8 @@ export function AddTradeModal({
     }
 
     const entryPrice = amount / shares;
-    const riskPerShare = ssl > 0 ? entryPrice - ssl : 0;
+    // SSL must be below entry price for valid risk calculation
+    const riskPerShare = ssl > 0 && ssl < entryPrice ? entryPrice - ssl : 0;
     const trim2r = riskPerShare > 0 ? entryPrice + 2 * riskPerShare : 0;
     const positionPct = equity > 0 ? (amount / equity) * 100 : 0;
     const totalRisk = riskPerShare * shares;
@@ -111,6 +117,22 @@ export function AddTradeModal({
     }
   }, [fetchCurrentPrice]);
 
+  // Fetch forex rate
+  const fetchForexRate = useCallback(async () => {
+    setRateLoading(true);
+    try {
+      const res = await fetch("/api/forex");
+      const data = await res.json();
+      if (data.rate) {
+        setGbpToUsd(data.rate);
+      }
+    } catch (err) {
+      console.error("Failed to fetch forex rate:", err);
+    } finally {
+      setRateLoading(false);
+    }
+  }, []);
+
   // Reset form when modal opens and lock body scroll
   useEffect(() => {
     if (isOpen) {
@@ -120,12 +142,14 @@ export function AddTradeModal({
       setTicker("");
       setShares(0);
       setAmount(0);
+      setAmountGBP(0);
       setSsl(0);
       setMode("MODE1");
       setIsSubmitting(false);
       setError(null);
       setCurrentPrice(0);
       setIsFetchingPrice(false);
+      fetchForexRate();
       setTimeout(() => tickerInputRef.current?.focus(), 100);
     }
 
@@ -135,7 +159,7 @@ export function AddTradeModal({
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [isOpen]);
+  }, [isOpen, fetchForexRate]);
 
   // Keyboard support (ESC to close)
   useEffect(() => {
@@ -337,33 +361,76 @@ export function AddTradeModal({
             />
           </div>
 
-          {/* Amount */}
+          {/* Amount (USD + GBP) */}
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700">
-              Amount ($)
+              Amount
             </label>
-            <Input
-              type="number"
-              value={amount || ""}
-              onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
-              placeholder="e.g., 10000"
-              className="h-7 text-xs font-mono"
-            />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">$</span>
+                  <Input
+                    type="number"
+                    value={amount || ""}
+                    onChange={(e) => {
+                      const usd = Math.max(0, Number(e.target.value));
+                      setAmount(usd);
+                      setAmountGBP(usd > 0 ? Math.round(usd / gbpToUsd) : 0);
+                    }}
+                    placeholder="10000"
+                    className="h-7 text-xs font-mono pl-5"
+                  />
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">£</span>
+                  <Input
+                    type="number"
+                    value={amountGBP || ""}
+                    onChange={(e) => {
+                      const gbp = Math.max(0, Number(e.target.value));
+                      setAmountGBP(gbp);
+                      setAmount(Math.round(gbp * gbpToUsd));
+                    }}
+                    placeholder="7874"
+                    className="h-7 text-xs font-mono pl-5"
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="mt-0.5 text-[10px] text-zinc-400">
+              {rateLoading ? "Loading rate..." : `Live rate: £1 = $${gbpToUsd.toFixed(4)}`}
+            </p>
           </div>
 
           {/* SSL (Stop Loss) */}
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700">
-              SSL (Stop Loss) ($)
+              SSL (Stop Loss Price)
+              {calculated.entryPrice > 0 && (
+                <span className="ml-2 font-normal text-zinc-400">
+                  Entry: ${calculated.entryPrice.toFixed(2)}
+                </span>
+              )}
             </label>
             <Input
               type="number"
               step="0.01"
               value={ssl || ""}
               onChange={(e) => setSsl(Math.max(0, Number(e.target.value)))}
-              placeholder="e.g., 135.00"
+              placeholder={calculated.entryPrice > 0 ? `e.g., ${(calculated.entryPrice * 0.95).toFixed(2)}` : "e.g., 175.00"}
               className="h-7 text-xs font-mono"
             />
+            <p className="mt-0.5 text-[10px] text-zinc-400">
+              Price per share where you&apos;d exit (must be below entry)
+            </p>
+            {ssl > 0 && calculated.entryPrice > 0 && ssl >= calculated.entryPrice && (
+              <p className="mt-0.5 text-[10px] text-red-500 font-medium">
+                SSL must be below entry price (${calculated.entryPrice.toFixed(2)})
+              </p>
+            )}
           </div>
 
           {/* Mode (ENTRY only) */}
@@ -424,24 +491,45 @@ export function AddTradeModal({
                     </div>
                   </>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Risk/Share:</span>
-                  <span className="font-mono font-medium text-red-600">
-                    ${calculated.riskPerShare.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Total Risk:</span>
-                  <span className="font-mono font-medium text-red-600">
-                    ${calculated.totalRisk.toFixed(0)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">2R Target:</span>
-                  <span className="font-mono font-medium text-green-600">
-                    ${calculated.trim2r.toFixed(2)}
-                  </span>
-                </div>
+                {calculated.riskPerShare > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Risk/Share:</span>
+                    <span className="font-mono font-medium text-red-600">
+                      ${calculated.riskPerShare.toFixed(2)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Risk/Share:</span>
+                    <span className="font-mono text-zinc-400">Set SSL</span>
+                  </div>
+                )}
+                {calculated.riskPerShare > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Total Risk:</span>
+                    <span className="font-mono font-medium text-red-600">
+                      ${calculated.totalRisk.toFixed(0)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Total Risk:</span>
+                    <span className="font-mono text-zinc-400">-</span>
+                  </div>
+                )}
+                {calculated.trim2r > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">2R Target:</span>
+                    <span className="font-mono font-medium text-green-600">
+                      ${calculated.trim2r.toFixed(2)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">2R Target:</span>
+                    <span className="font-mono text-zinc-400">-</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
