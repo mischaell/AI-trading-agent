@@ -57,7 +57,14 @@ export interface PullbackTickerData extends UniverseLeader {
   is_21ema_advancing?: boolean;
   /** Whether 10WMA is advancing (rising) */
   is_10wma_advancing?: boolean;
+  /** 1-day price change percentage (for 1-day RS ranking) */
+  one_day_change_pct?: number;
 }
+
+/**
+ * Sort method for pullback candidates
+ */
+export type PullbackSortMethod = 'backtest_score' | 'one_day_rs' | 'ibd_rs';
 
 /**
  * Pullback filter criteria
@@ -85,6 +92,8 @@ export interface PullbackFilterCriteria {
   require_advancing_10wma?: boolean;
   /** Target candidate count range */
   target_count?: { min: number; max: number };
+  /** Sort method: 'backtest_score' (default), 'one_day_rs', or 'ibd_rs' */
+  sort_by?: PullbackSortMethod;
 }
 
 /**
@@ -133,6 +142,26 @@ export const DEFAULT_PULLBACK_CRITERIA: Required<PullbackFilterCriteria> = {
   require_advancing_21ema: false, // Removed: not required
   require_advancing_10wma: false, // Removed: not required
   target_count: { min: 10, max: 30 }, // Target 10-30 candidates
+  sort_by: 'backtest_score',    // Default: sort by backtest score
+};
+
+/**
+ * Aggressive pullback criteria for broader scans
+ * Use with AGGRESSIVE_UNIVERSE_CRITERIA for maximum overlap with external scans
+ */
+export const AGGRESSIVE_PULLBACK_CRITERIA: Required<PullbackFilterCriteria> = {
+  min_dist_21_atr: -5.0,        // Very wide: -5 to 6 x ATR
+  max_dist_21_atr: 6.0,
+  min_dist_50_atr: -10.0,       // Very wide
+  max_dist_50_atr: 15.0,
+  min_close_range_pct: 0,       // No minimum
+  require_contraction: false,   // Not required
+  max_weekly_return_pct: 50,    // Very wide: up to 50%
+  min_earnings_days: 0,         // No earnings filter
+  require_advancing_21ema: false,
+  require_advancing_10wma: false,
+  target_count: { min: 30, max: 75 }, // Target 30-75 candidates
+  sort_by: 'one_day_rs',        // Sort by 1-day RS for momentum ranking
 };
 
 /**
@@ -526,7 +555,7 @@ function calculateBacktestScore(data: PullbackTickerData): number {
 /**
  * Sort candidates by backtest-style score (highest first)
  */
-function sortCandidates(
+function sortByBacktestScore(
   candidates: Array<{ data: PullbackTickerData; result: PullbackFilterResult }>
 ): Array<{ data: PullbackTickerData; result: PullbackFilterResult }> {
   return [...candidates].sort((a, b) => {
@@ -538,6 +567,58 @@ function sortCandidates(
     // Secondary: RS (higher first)
     return b.data.rs - a.data.rs;
   });
+}
+
+/**
+ * Sort candidates by 1-day RS (today's % change, highest first)
+ */
+function sortByOneDayRS(
+  candidates: Array<{ data: PullbackTickerData; result: PullbackFilterResult }>
+): Array<{ data: PullbackTickerData; result: PullbackFilterResult }> {
+  return [...candidates].sort((a, b) => {
+    // Primary: 1-day change % (higher first)
+    const changeA = a.data.one_day_change_pct ?? 0;
+    const changeB = b.data.one_day_change_pct ?? 0;
+    if (changeB !== changeA) return changeB - changeA;
+
+    // Secondary: IBD RS (higher first)
+    return b.data.rs - a.data.rs;
+  });
+}
+
+/**
+ * Sort candidates by IBD RS (higher first)
+ */
+function sortByIBDRS(
+  candidates: Array<{ data: PullbackTickerData; result: PullbackFilterResult }>
+): Array<{ data: PullbackTickerData; result: PullbackFilterResult }> {
+  return [...candidates].sort((a, b) => {
+    // Primary: IBD RS (higher first)
+    if (b.data.rs !== a.data.rs) return b.data.rs - a.data.rs;
+
+    // Secondary: 1-day change % (higher first)
+    const changeA = a.data.one_day_change_pct ?? 0;
+    const changeB = b.data.one_day_change_pct ?? 0;
+    return changeB - changeA;
+  });
+}
+
+/**
+ * Sort candidates by specified method
+ */
+function sortCandidates(
+  candidates: Array<{ data: PullbackTickerData; result: PullbackFilterResult }>,
+  method: PullbackSortMethod = 'backtest_score'
+): Array<{ data: PullbackTickerData; result: PullbackFilterResult }> {
+  switch (method) {
+    case 'one_day_rs':
+      return sortByOneDayRS(candidates);
+    case 'ibd_rs':
+      return sortByIBDRS(candidates);
+    case 'backtest_score':
+    default:
+      return sortByBacktestScore(candidates);
+  }
 }
 
 /**
@@ -599,6 +680,8 @@ function toPullbackCandidate(
     score,
     ema21_close: data.ema21_close,
     structure_intact: structureIntact,
+    // 1-day RS field
+    one_day_change_pct: data.one_day_change_pct,
   };
 }
 
@@ -650,8 +733,8 @@ export function scanPullbackCandidates(
   // Filter to only passed candidates
   const passedCandidates = results.filter(r => r.result.passed);
 
-  // Sort by grade and RS
-  const sortedCandidates = sortCandidates(passedCandidates);
+  // Sort by specified method (default: backtest_score)
+  const sortedCandidates = sortCandidates(passedCandidates, mergedCriteria.sort_by);
 
   // Limit to target count range
   const { max } = mergedCriteria.target_count;
@@ -733,9 +816,12 @@ export {
   applyPullbackFilters,
   calculateGrade,
   sortCandidates,
+  sortByOneDayRS,
+  sortByIBDRS,
+  sortByBacktestScore,
   toPullbackCandidate,
   determineStructurePosition,
   toDecimal,
 };
 
-export type { StructurePosition, FilterCheck, PullbackFilterResult };
+export type { StructurePosition, FilterCheck, PullbackFilterResult, PullbackSortMethod };

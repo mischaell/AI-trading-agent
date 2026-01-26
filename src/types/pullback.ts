@@ -73,6 +73,11 @@ export interface PullbackCandidate {
   ema21_close?: number;
   /** Whether structure is intact (close >= ema21_low) */
   structure_intact?: boolean;
+
+  // === 1-Day RS Fields ===
+
+  /** 1-day price change percentage (for 1-day RS ranking) */
+  one_day_change_pct?: number;
 }
 
 /**

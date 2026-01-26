@@ -30,6 +30,9 @@ export interface TickerStructureAnalysis {
   close: number;
   high: number;
   low: number;
+  prev_close: number;      // Previous day's close
+  // 1-day performance (for 1-day RS ranking)
+  one_day_change_pct: number;  // Today's % change vs yesterday
   // 21EMA Structure (the "cloud")
   ema21_high: number;    // MA of highs
   ema21_close: number;   // MA of closes
@@ -307,9 +310,16 @@ export function analyzeStructure(
   // Calculate 14-day ATR
   const atr14 = calculateATR(bars, 14);
 
-  // Get latest bar
+  // Get latest bar and previous bar
   const latestBar = bars[bars.length - 1];
+  const prevBar = bars[bars.length - 2];
   const close = latestBar.close;
+  const prev_close = prevBar?.close ?? close;
+
+  // Calculate 1-day change percentage
+  const one_day_change_pct = prev_close > 0
+    ? toDecimal(close).minus(prev_close).div(prev_close).times(100).toNumber()
+    : 0;
 
   // Calculate distances in ATR units
   const dist_21ema_atr = calculateDistanceATR(close, ema21_close, atr14);
@@ -337,6 +347,8 @@ export function analyzeStructure(
     close,
     high: latestBar.high,
     low: latestBar.low,
+    prev_close: Math.round(prev_close * 100) / 100,
+    one_day_change_pct: Math.round(one_day_change_pct * 100) / 100,
     ema21_high: Math.round(ema21_high * 100) / 100,
     ema21_close: Math.round(ema21_close * 100) / 100,
     ema21_low: Math.round(ema21_low * 100) / 100,

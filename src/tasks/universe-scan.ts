@@ -110,6 +110,23 @@ export const DEFAULT_UNIVERSE_CRITERIA: Required<UniverseFilterCriteria> = {
 };
 
 /**
+ * Aggressive filter criteria - no sector exclusions, higher ADR cap
+ * For broader pullback scans that include industrials, defense, crypto miners etc.
+ */
+export const AGGRESSIVE_UNIVERSE_CRITERIA: Required<UniverseFilterCriteria> = {
+  min_rs: 0,                    // No RS minimum
+  min_liquidity_m: 100,         // $100M daily dollar liquidity (lower)
+  min_volume_m: 0.5,            // 500K shares avg daily volume (lower)
+  min_adr_pct: 2.0,             // ADR > 2.0% (lower)
+  max_adr_pct: 20,              // ADR < 20% (higher - includes crypto miners)
+  min_price: 5,                 // Price > $5 (lower)
+  min_market_cap_b: 0.5,        // Market cap > $500M (lower)
+  exclude_china: true,          // Still exclude China ADRs
+  exclude_sectors: false,       // NO sector exclusions - include all
+  target_count: { min: 50, max: 75 },
+};
+
+/**
  * Sectors to exclude from universe
  * Biotech, Materials, Defensive, Energy, Utilities, Real Estate, Healthcare, Industrials
  */
