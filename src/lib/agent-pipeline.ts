@@ -46,11 +46,13 @@ import {
 import {
   scanLiquidLeaders,
   TickerData,
+  AGGRESSIVE_UNIVERSE_CRITERIA,
 } from '@/tasks/universe-scan';
 
 import {
   scanPullbackCandidates,
   PullbackTickerData,
+  AGGRESSIVE_PULLBACK_CRITERIA,
 } from '@/tasks/pullback-scan';
 
 import {
@@ -237,6 +239,7 @@ interface StructureAnalysis {
   weekly_return_pct: number;
   close_range_pct: number;
   is_contracting: boolean;
+  one_day_change_pct: number;  // Today's % change vs yesterday (for 1-day RS sort)
 }
 
 interface EarningsData {
@@ -425,10 +428,10 @@ const TICKER_THEMES: Record<string, string> = {
 };
 
 const PULLBACK_CRITERIA = {
-  min_dist_21_atr: -3.0,   // Widened to capture deeper pullbacks
-  max_dist_21_atr: 4.0,    // Widened to include extended stocks
+  min_dist_21_atr: -5.0,   // Match AGGRESSIVE_PULLBACK_CRITERIA
+  max_dist_21_atr: 6.0,    // Match AGGRESSIVE_PULLBACK_CRITERIA
   // dist_50 filter removed to maximize candidates
-  max_weekly_return_pct: 20, // Increased to allow more setups
+  max_weekly_return_pct: 50, // Match AGGRESSIVE_PULLBACK_CRITERIA
 };
 
 // =============================================================================
@@ -779,6 +782,11 @@ function analyzeTickerStructure(ticker: string, bars: OHLCBar[]): StructureAnaly
     bars.slice(-20).reduce((min, b) => Math.min(min, toNumber(b.low)), Infinity);
   const is_contracting = range5d < range20d * 0.8;
 
+  // 1-day change for RS ranking
+  const prevBar = bars.length >= 2 ? bars[bars.length - 2] : null;
+  const prevClose = prevBar ? toNumber(prevBar.close) : close;
+  const one_day_change_pct = prevClose > 0 ? ((close - prevClose) / prevClose) * 100 : 0;
+
   return {
     ticker,
     close: Math.round(close * 100) / 100,
@@ -794,6 +802,7 @@ function analyzeTickerStructure(ticker: string, bars: OHLCBar[]): StructureAnaly
     weekly_return_pct: Math.round(weekly_return_pct * 100) / 100,
     close_range_pct: Math.round(close_range_pct),
     is_contracting,
+    one_day_change_pct: Math.round(one_day_change_pct * 100) / 100,
   };
 }
 
@@ -1419,7 +1428,7 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
 
     console.log(`[Pipeline] Task 2: Built TickerData for ${tickerDataForScan.length} liquid leaders`);
 
-    const universe = scanLiquidLeaders(tickerDataForScan);
+    const universe = scanLiquidLeaders(tickerDataForScan, AGGRESSIVE_UNIVERSE_CRITERIA);
     await notify('Task 2', 'complete', 25, `Found ${universe.count} liquid leaders from ${dailyScanResults.length} scanned`);
 
     // Build rsData map from daily scan results for later use
@@ -1519,10 +1528,12 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
         // Advancing EMA fields from universe data API
         is_21ema_advancing: univItem?.is21EmaAdvancing,
         is_10wma_advancing: univItem?.is10WmaAdvancing,
+        // 1-day change for sorting
+        one_day_change_pct: structure.one_day_change_pct,
       });
     }
 
-    const pullbacks = scanPullbackCandidates(pullbackCandidates);
+    const pullbacks = scanPullbackCandidates(pullbackCandidates, AGGRESSIVE_PULLBACK_CRITERIA);
     await notify('Task 3', 'complete', 50, `Found ${pullbacks.count} pullback candidates`);
 
     // Enrich universe leaders with calculated structure data + backtest-style scoring
