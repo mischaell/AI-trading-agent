@@ -2606,7 +2606,7 @@ function ViewPortfolio({
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono">{p.weight.toFixed(1)}%</TableCell>
-                        <TableCell className="text-right font-mono">${fmtUsdCompact(p.value ?? 0)} ({p.shares})</TableCell>
+                        <TableCell className="text-right font-mono">{fmtUsdCompact(p.value ?? 0)} ({p.shares})</TableCell>
                         <TableCell className={`text-right font-mono ${urPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {urPnl >= 0 ? '+' : ''}{fmtUsd(urPnl)}
                         </TableCell>
