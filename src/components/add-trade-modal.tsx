@@ -494,12 +494,26 @@ export function AddTradeModal({
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700">
               Shares
+              {currentPrice > 0 && shares > 0 && (
+                <span className="ml-2 font-normal text-zinc-400">
+                  = ${(shares * currentPrice).toLocaleString()}
+                </span>
+              )}
             </label>
             <Input
               type="number"
               value={shares || ""}
-              onChange={(e) => setShares(Math.max(0, Math.floor(Number(e.target.value))))}
-              placeholder="e.g., 100"
+              onChange={(e) => {
+                const newShares = Math.max(0, Math.floor(Number(e.target.value)));
+                setShares(newShares);
+                // Auto-calculate amount if we have current price
+                if (currentPrice > 0 && newShares > 0) {
+                  const newAmount = Math.round(newShares * currentPrice);
+                  setAmount(newAmount);
+                  setAmountGBP(Math.round(newAmount / gbpToUsd));
+                }
+              }}
+              placeholder={currentPrice > 0 ? `e.g., ${Math.floor(10000 / currentPrice)}` : "e.g., 100"}
               className="h-7 text-xs font-mono"
             />
           </div>
@@ -508,6 +522,11 @@ export function AddTradeModal({
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700">
               Amount
+              {currentPrice > 0 && amount > 0 && (
+                <span className="ml-2 font-normal text-zinc-400">
+                  = {Math.floor(amount / currentPrice)} shares
+                </span>
+              )}
             </label>
             <div className="flex gap-2">
               <div className="flex-1">
@@ -520,6 +539,10 @@ export function AddTradeModal({
                       const usd = Math.max(0, Number(e.target.value));
                       setAmount(usd);
                       setAmountGBP(usd > 0 ? Math.round(usd / gbpToUsd) : 0);
+                      // Auto-calculate shares if we have current price
+                      if (currentPrice > 0 && usd > 0) {
+                        setShares(Math.floor(usd / currentPrice));
+                      }
                     }}
                     placeholder="10000"
                     className="h-7 text-xs font-mono pl-5"
@@ -535,7 +558,12 @@ export function AddTradeModal({
                     onChange={(e) => {
                       const gbp = Math.max(0, Number(e.target.value));
                       setAmountGBP(gbp);
-                      setAmount(Math.round(gbp * gbpToUsd));
+                      const usd = Math.round(gbp * gbpToUsd);
+                      setAmount(usd);
+                      // Auto-calculate shares if we have current price
+                      if (currentPrice > 0 && usd > 0) {
+                        setShares(Math.floor(usd / currentPrice));
+                      }
                     }}
                     placeholder="7874"
                     className="h-7 text-xs font-mono pl-5"
@@ -545,6 +573,7 @@ export function AddTradeModal({
             </div>
             <p className="mt-0.5 text-[10px] text-zinc-400">
               {rateLoading ? "Loading rate..." : `Live rate: £1 = $${gbpToUsd.toFixed(4)}`}
+              {currentPrice === 0 && ticker && " • Enter ticker to auto-calculate"}
             </p>
           </div>
 
