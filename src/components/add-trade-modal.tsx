@@ -37,6 +37,10 @@ export function AddTradeModal({
   const [gbpToUsd, setGbpToUsd] = useState<number>(1.27);
   const [rateLoading, setRateLoading] = useState(false);
 
+  // Quick fill text parser
+  const [quickFillText, setQuickFillText] = useState("");
+  const [parseError, setParseError] = useState<string | null>(null);
+
   // Form state
   const [tradeType, setTradeType] = useState<TradeType>("ENTRY");
   const [ticker, setTicker] = useState("");
@@ -159,11 +163,85 @@ export function AddTradeModal({
     }
   }, []);
 
+  // Parse quick fill text: "Long 8% CIFR @ 17.55 (SSL @ 16.37) (EC risk : -0.56%) (1/3 at 2R @ 19.91)"
+  const parseQuickFill = useCallback((text: string) => {
+    setParseError(null);
+
+    if (!text.trim()) {
+      setParseError("Enter trade text to parse");
+      return;
+    }
+
+    try {
+      // Extract position % (e.g., "8%")
+      const positionPctMatch = text.match(/(\d+(?:\.\d+)?)\s*%/);
+      if (!positionPctMatch) {
+        setParseError("Could not find position % (e.g., '8%')");
+        return;
+      }
+      const positionPct = parseFloat(positionPctMatch[1]);
+
+      // Extract ticker (word after % or before @)
+      // Pattern: "8% CIFR @" or "Long 8% CIFR"
+      const tickerMatch = text.match(/\d+(?:\.\d+)?\s*%\s+([A-Za-z]+)/);
+      if (!tickerMatch) {
+        setParseError("Could not find ticker symbol");
+        return;
+      }
+      const parsedTicker = tickerMatch[1].toUpperCase();
+
+      // Extract entry price (number after @, before parenthesis or space)
+      const entryMatch = text.match(/@\s*(\d+(?:\.\d+)?)/);
+      if (!entryMatch) {
+        setParseError("Could not find entry price (e.g., '@ 17.55')");
+        return;
+      }
+      const entryPrice = parseFloat(entryMatch[1]);
+
+      // Extract SSL (number after "SSL @" or "SSL:")
+      const sslMatch = text.match(/SSL\s*[@:]\s*(\d+(?:\.\d+)?)/i);
+      if (!sslMatch) {
+        setParseError("Could not find SSL (e.g., 'SSL @ 16.37')");
+        return;
+      }
+      const parsedSsl = parseFloat(sslMatch[1]);
+
+      // Calculate amount and shares from position %
+      const calculatedAmount = Math.round(equity * (positionPct / 100));
+      const calculatedShares = Math.floor(calculatedAmount / entryPrice);
+
+      // Check if position exists
+      const existingPos = existingPositions.find(
+        (p) => p.ticker.toUpperCase() === parsedTicker
+      );
+
+      // Set all form values
+      setTradeType(existingPos ? "ADD" : "ENTRY");
+      setTicker(parsedTicker);
+      setAmount(calculatedAmount);
+      setAmountGBP(Math.round(calculatedAmount / gbpToUsd));
+      setShares(calculatedShares);
+      setSsl(parsedSsl);
+
+      // Fetch current price for the ticker
+      fetchCurrentPrice(parsedTicker);
+
+      // Clear input after successful parse
+      setQuickFillText("");
+
+    } catch (err) {
+      console.error("Parse error:", err);
+      setParseError("Failed to parse trade text");
+    }
+  }, [equity, existingPositions, gbpToUsd, fetchCurrentPrice]);
+
   // Reset form when modal opens and lock body scroll
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
 
+      setQuickFillText("");
+      setParseError(null);
       setTradeType("ENTRY");
       setTicker("");
       setShares(0);
@@ -298,6 +376,43 @@ export function AddTradeModal({
 
         {/* Content */}
         <div className="space-y-2.5 px-4 py-3">
+          {/* Quick Fill Parser */}
+          <div className="rounded-lg bg-blue-50 p-2">
+            <label className="mb-1 block text-[10px] font-medium text-blue-700 uppercase tracking-wide">
+              Quick Fill (paste trade text)
+            </label>
+            <div className="flex gap-1.5">
+              <Input
+                type="text"
+                value={quickFillText}
+                onChange={(e) => setQuickFillText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    parseQuickFill(quickFillText);
+                  }
+                }}
+                placeholder="Long 8% CIFR @ 17.55 (SSL @ 16.37)..."
+                className="h-7 text-xs font-mono flex-1 bg-white"
+              />
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={() => parseQuickFill(quickFillText)}
+                className="h-7 text-xs px-3"
+              >
+                Parse
+              </Button>
+            </div>
+            {parseError && (
+              <p className="mt-1 text-[10px] text-red-600">{parseError}</p>
+            )}
+            <p className="mt-1 text-[10px] text-blue-600">
+              Format: Long 8% TICKER @ entry (SSL @ stop)
+            </p>
+          </div>
+
           {/* Trade Type Toggle */}
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700">
