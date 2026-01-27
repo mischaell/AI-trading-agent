@@ -155,3 +155,163 @@ All tests PASSED! Portfolio calculations are correct.
 ```bash
 npx tsx src/tasks/__tests__/portfolio-calculations.test.ts
 ```
+
+---
+
+# Filter Criteria Unit Tests
+
+**Date:** 2026-01-27
+**Status:** All 33 tests PASSED
+
+## Purpose
+
+Tests the Liquid Leaders filter logic WITHOUT requiring full API scans. Uses mock data to validate filter behavior for both DEFAULT and AGGRESSIVE criteria.
+
+## Test Summary
+
+| Category | Tests | Status |
+|----------|-------|--------|
+| Default Criteria | 8 | PASS |
+| Aggressive Criteria | 15 | PASS |
+| Exchange Coverage | 10 | PASS |
+
+## Filter Criteria Definitions
+
+### DEFAULT Criteria (Conservative)
+```
+minLiquidityM: 250      # $250M daily liquidity
+minVolumeM: 1.0         # 1M shares/day
+minMarketCapB: 1.0      # $1B market cap
+minAdrPct: 2.5          # 2.5% ADR minimum
+maxAdrPct: 10.0         # 10% ADR maximum
+minPrice: 10            # $10 minimum price
+excludeChina: true      # Exclude China ADRs
+excludeSectors: true    # Exclude biotech, energy, utilities, financials, etc.
+```
+
+### AGGRESSIVE Criteria (Broad - includes all sectors)
+```
+minLiquidityM: 100      # $100M daily liquidity
+minVolumeM: 0.5         # 500K shares/day
+minMarketCapB: 0.5      # $500M market cap
+minAdrPct: 2.0          # 2.0% ADR minimum
+maxAdrPct: 20.0         # 20% ADR maximum (includes crypto miners)
+minPrice: 5             # $5 minimum price
+excludeChina: true      # Still exclude China ADRs
+excludeSectors: false   # NO sector exclusions
+```
+
+## Stocks Included with Aggressive (not in Default)
+
+| Ticker | Exchange | Sector | Why Excluded from Default |
+|--------|----------|--------|---------------------------|
+| WULF | NASDAQ | Crypto Mining | High ADR |
+| APLD | NASDAQ | Crypto Mining | High ADR |
+| IREN | NASDAQ | Crypto Mining | High ADR |
+| HUT | NASDAQ | Crypto Mining | High ADR |
+| CIFR | NASDAQ | Crypto Mining | High ADR |
+| NOC | NYSE | Aerospace & Defense | Sector exclusion |
+| LMT | NYSE | Aerospace & Defense | Sector exclusion |
+| GS | NYSE | Financial Services | Sector exclusion |
+| IBKR | NASDAQ | Financial Services | Sector exclusion |
+| CAT | NYSE | Machinery | Sector exclusion |
+| VRT | NYSE | Industrial Equipment | Not on NASDAQ |
+
+## NYSE vs NASDAQ Coverage
+
+The daily scan now fetches both exchanges:
+- **NASDAQ:** ~1,407 stocks after pre-filter
+- **NYSE:** ~1,706 stocks after pre-filter
+- **Combined:** ~3,113 stocks
+
+### Expected Tickers by Exchange
+
+**On NASDAQ (30):**
+```
+WULF, APLD, IREN, HUT, AMD, AMAT, RKLB, CIFR, KLAC, MU, IBKR, TER, STX,
+ASML, FTAI, ADI, MCHP, SATS, LRCX, MDB, ON, MTSI, ASTS, NBIS, WDC, KTOS,
+ENTG, LITE, SNDK, EOSE
+```
+
+**On NYSE (19):**
+```
+CLS, PL, VRT, COMP, NOC, LHX, W, CIEN, BE, LMT, GEV, JBL, APH, CVNA, GLW,
+HWM, COHR, CAT, GS
+```
+
+## Test Files
+
+| File | Purpose |
+|------|---------|
+| `filter-criteria.test.ts` | Unit tests with mock data (no API calls) |
+| `check-expected-tickers.ts` | Validates expected tickers pass filters |
+| `check-nasdaq-coverage.ts` | Shows which tickers need NYSE scan |
+
+## How to Run
+
+```bash
+# Full filter criteria unit tests (no API needed)
+npx tsx src/tasks/__tests__/filter-criteria.test.ts
+
+# Check if expected tickers pass filters (requires local server)
+npx tsx src/tasks/__tests__/check-expected-tickers.ts
+
+# Check which expected tickers are on NASDAQ vs NYSE
+npx tsx src/tasks/__tests__/check-nasdaq-coverage.ts
+```
+
+## Test Output
+
+```
+======================================================================
+FILTER CRITERIA UNIT TESTS
+======================================================================
+
+📋 DEFAULT CRITERIA TESTS
+
+  ✓ AMD passes default criteria
+  ✓ NVDA passes default criteria
+  ✓ MDB passes default criteria
+  ✓ BABA fails default criteria (China ADR)
+  ✓ GS fails default criteria (financial services)
+  ✓ IBKR fails default criteria (financial services)
+  ✓ TINY fails default criteria (low liquidity)
+  ✓ PNNY fails default criteria (low price)
+
+📋 AGGRESSIVE CRITERIA TESTS
+
+  ✓ WULF passes aggressive criteria (crypto miner)
+  ✓ APLD passes aggressive criteria (crypto miner)
+  ✓ IREN passes aggressive criteria (crypto miner)
+  ✓ HUT passes aggressive criteria (crypto miner)
+  ✓ NOC passes aggressive criteria (defense - no sector exclusion)
+  ✓ LMT passes aggressive criteria (defense)
+  ✓ GS passes aggressive criteria (financial - no sector exclusion)
+  ✓ IBKR passes aggressive criteria (financial)
+  ✓ CAT passes aggressive criteria (industrial)
+  ✓ VRT passes aggressive criteria (industrial)
+  ✓ RKLB passes aggressive criteria (high ADR ok)
+  ✓ BABA fails aggressive criteria (China ADR still excluded)
+  ✓ WILD fails aggressive criteria (ADR > 20%)
+  ✓ TINY fails aggressive criteria (liquidity < $100M)
+  ✓ BORE fails aggressive criteria (ADR < 2%)
+
+📋 EXCHANGE COVERAGE TESTS
+
+  ✓ NASDAQ stocks in mock data: 20
+  ✓ NYSE stocks in mock data: 8
+  ✓ NASDAQ stocks passing aggressive: 16/20
+  ✓ NYSE stocks passing aggressive: 6/8
+  ✓ NOC (NYSE) passes aggressive filters
+  ✓ LMT (NYSE) passes aggressive filters
+  ✓ LHX (NYSE) passes aggressive filters
+  ✓ GS (NYSE) passes aggressive filters
+  ✓ CAT (NYSE) passes aggressive filters
+  ✓ VRT (NYSE) passes aggressive filters
+
+======================================================================
+RESULTS: 33/33 tests passed
+======================================================================
+
+✅ All tests passed!
+```
