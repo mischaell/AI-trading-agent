@@ -8,13 +8,18 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-initialize Supabase client (avoids module load errors if env vars missing)
+function getSupabaseClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    console.warn('[Cron] Missing Supabase credentials');
+    return null;
+  }
+  return createClient(url, key);
+}
 
 interface ScanResult {
   success: boolean;
@@ -108,13 +113,20 @@ export async function GET(request: Request) {
     };
 
     // Upsert to cache table (create if not exists)
-    const { error: upsertError } = await supabase
-      .from('daily_scan_cache')
-      .upsert(cacheData, { onConflict: 'scan_date' });
+    const supabase = getSupabaseClient();
+    let upsertError = null;
 
-    if (upsertError) {
+    if (supabase) {
+      const result = await supabase
+        .from('daily_scan_cache')
+        .upsert(cacheData, { onConflict: 'scan_date' });
+      upsertError = result.error;
+    }
+
+    if (!supabase) {
+      console.warn('[Cron] Supabase not configured - skipping cache');
+    } else if (upsertError) {
       console.error('[Cron] Failed to cache results:', upsertError);
-      // Don't fail the whole cron job if caching fails
     } else {
       console.log('[Cron] Results cached to Supabase');
     }
