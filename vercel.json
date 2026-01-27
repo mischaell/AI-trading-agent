@@ -16,6 +16,18 @@
     },
     "src/app/api/extract-breadth/route.ts": {
       "maxDuration": 30
+    },
+    "src/app/api/daily-scan/route.ts": {
+      "maxDuration": 900
+    },
+    "src/app/api/cron/nightly-scan/route.ts": {
+      "maxDuration": 900
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/nightly-scan",
+      "schedule": "0 2 * * 1-5"
+    }
+  ]
 }

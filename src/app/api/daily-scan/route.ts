@@ -390,7 +390,9 @@ export async function POST() {
       timestamp: new Date().toISOString(),
       elapsed: `${elapsed}s`,
       stats: {
-        nasdaqTotal: nasdaqStocks.length,
+        nasdaqTotal: nasdaqRaw.length,
+        nyseTotal: nyseRaw.length,
+        combinedTotal: allStocks.length,
         preFiltered: preFiltered.length,
         afterNameFilter: nameFiltered.length,
         withData: allData.length,
