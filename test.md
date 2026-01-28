@@ -315,3 +315,50 @@ RESULTS: 33/33 tests passed
 
 ✅ All tests passed!
 ```
+
+---
+
+# Pipeline Diagnostics Tests
+
+**Date:** 2026-01-28
+**Status:** NEW
+
+## Purpose
+
+Validates every pipeline task's output quality, detects empty arrays, bad data, and tracks which fallback defaults are in effect. Also provides a live `/api/diagnostics` endpoint for checking system health.
+
+## Test Summary
+
+| Category | What it checks |
+|----------|---------------|
+| Task 1: Market Analysis | market_state defined, permissions defined, MCO Z-score in range |
+| Task 2: Universe Scan | count > 0, no duplicates, RS 1-99, positive prices, ADR in range |
+| Task 3: Pullback Scan | candidates array populated, no NaN dist_21_atr |
+| Task 4: Entry Readiness | rows array, at least some READY, earnings_days not default |
+| Task 5: Focus List | top5 populated, candidates not empty |
+| Task 6: Position Sizing | sizing array, PASS count > 0, shares > 0, NER in range |
+| Task 7: Execution Plan | suggested_trades and withheld_trades defined |
+| Task 8: Portfolio | positions array, valid prices/shares/PnL |
+| Task 9: Overview | trades_today defined |
+| Fallback tracking | Logs every default value used during the run |
+
+## How to Run
+
+```bash
+# Pipeline diagnostics test (mock data)
+npx tsx src/tasks/__tests__/pipeline-diagnostics.ts
+
+# Live system health check
+curl http://localhost:3000/api/diagnostics | jq .
+
+# Production health check
+curl https://ai-trading-agent-lake.vercel.app/api/diagnostics | jq .
+```
+
+## Test Files
+
+| File | Purpose |
+|------|---------|
+| `src/tasks/__tests__/pipeline-diagnostics.ts` | Mock data quality validation for all 9 tasks |
+| `src/app/api/diagnostics/route.ts` | Live health check endpoint (Supabase caches, cron, fallbacks) |
+| `docs/PIPELINE-DIAGNOSTICS.md` | Full documentation of dependencies, caches, fallbacks |

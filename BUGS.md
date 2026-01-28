@@ -192,6 +192,34 @@ This was redundant and confusing for users.
 
 ---
 
+### 5. Liquid Leaders & Pullback Scan Empty on Initial Load (Fixed)
+
+**Files:** `src/lib/agent-pipeline.ts`, `src/lib/supabase/queries.ts`, `src/lib/supabase/index.ts`
+
+**Issue:** Liquid Leaders and Pullback Scan sections showed empty results on both localhost and production. Affected every fresh page load (no localStorage cache).
+
+**Root Cause:** The pipeline's `skipDailyScan=true` path (used on every initial page load) fell through to `dailyScanResults = []` when no localStorage cache existed. There was no fallback to read from the Supabase `daily_scan_cache` table, even though the nightly cron job writes scan results there.
+
+**Fix:** Added `getDailyScanCache()` Supabase query and wired it as a fallback in the `skipDailyScan` path. Flow is now: localStorage → Supabase `daily_scan_cache` → empty (with user prompt). Successfully loaded results are also persisted back to localStorage for instant subsequent loads.
+
+**Status:** Fixed - 2026-01-28
+
+---
+
+### 6. Missing `portfolio_ner_exceeded` in WITHHOLD_DETAIL_TEMPLATES (Fixed)
+
+**File:** `src/tasks/execution-plan.ts`, `src/lib/market-data/__tests__/test-task7.ts`
+
+**Issue:** Pipeline crashed with `(0 , eh[i.withhold_reason]) is not a function` when a trade was withheld for `portfolio_ner_exceeded`.
+
+**Root Cause:** `WITHHOLD_DETAIL_TEMPLATES` mapped 4 of 5 `WithholdReason` values to template functions, but `portfolio_ner_exceeded` was missing. The bracket lookup returned `undefined`, and calling it as a function threw a runtime error.
+
+**Fix:** Added the missing `portfolio_ner_exceeded` entry to the template object in both the main code and the test file.
+
+**Status:** Fixed - 2026-01-28
+
+---
+
 ## Technical Debt
 
 ### 1. Hardcoded Mock Data
@@ -239,4 +267,22 @@ Consider adding these compiler options to fix iterator issues:
 
 ---
 
-*Last updated: 2026-01-25*
+## Runtime Bug #7: Supabase Upsert Silently Skipped in Daily Scan
+
+**File:** `src/app/api/daily-scan/route.ts:410-411`, `src/app/api/cron/nightly-scan/route.ts:16`
+
+**Issue:** After a successful scan (75 leaders, 216s), the Supabase cache write was silently skipped. The `daily_scan_cache` table remained empty despite scans completing successfully.
+
+**Root cause:** The code used `process.env.SUPABASE_SERVICE_ROLE_KEY` which was never set in `.env.local` or Vercel environment variables. The `if (sbUrl && sbKey)` guard evaluated to false, silently skipping the entire cache block with no warning logged.
+
+**Fix:** Added fallback to `NEXT_PUBLIC_SUPABASE_ANON_KEY`:
+```typescript
+const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+```
+Applied to both `daily-scan/route.ts` and `cron/nightly-scan/route.ts`.
+
+**Date:** 2026-01-28
+
+---
+
+*Last updated: 2026-01-28*

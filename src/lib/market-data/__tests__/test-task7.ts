@@ -680,6 +680,7 @@ const WITHHOLD_DETAIL_TEMPLATES: Record<WithholdReason, (sizing: SizingOutput) =
     return `NER exceeds limit (${sizing.ec_risk_percent.toFixed(2)}% > ${maxNer.toFixed(2)}%)`;
   },
   earnings_too_close: () => 'Earnings within 7 days',
+  portfolio_ner_exceeded: () => 'Portfolio NER limit exceeded',
   exposure_limit_reached: () => 'Exposure limit reached',
 };
 

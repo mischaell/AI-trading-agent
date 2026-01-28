@@ -247,6 +247,9 @@ const WITHHOLD_DETAIL_TEMPLATES: Record<WithholdReason, (sizing: SizingOutput) =
   earnings_too_close: () =>
     'Earnings within 7 days — trade withheld per risk rules',
 
+  portfolio_ner_exceeded: () =>
+    'Adding this position would exceed maximum portfolio NER limit',
+
   exposure_limit_reached: () =>
     'Position would exceed maximum exposure limit',
 };

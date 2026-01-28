@@ -12,6 +12,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import YahooFinance from 'yahoo-finance2';
 
 // Initialize Yahoo Finance
@@ -385,7 +386,7 @@ export async function POST() {
       failureReasons[reason] = (failureReasons[reason] || 0) + 1;
     }
 
-    return NextResponse.json({
+    const responseData = {
       success: true,
       timestamp: new Date().toISOString(),
       elapsed: `${elapsed}s`,
@@ -402,7 +403,33 @@ export async function POST() {
       failureReasons,
       liquidLeaders,
       allPassed: passed,
-    });
+    };
+
+    // Cache to Supabase for cross-device access
+    try {
+      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (sbUrl && sbKey) {
+        const supabase = createClient(sbUrl, sbKey);
+        const { error: upsertErr } = await supabase.from('daily_scan_cache').upsert({
+          scan_date: new Date().toISOString().split('T')[0],
+          scan_timestamp: responseData.timestamp,
+          stats: responseData.stats,
+          liquid_leaders: responseData.liquidLeaders,
+          all_passed: responseData.allPassed,
+          elapsed: responseData.elapsed,
+        }, { onConflict: 'scan_date' });
+        if (upsertErr) {
+          console.error('[DailyScan] Supabase upsert error:', JSON.stringify(upsertErr));
+        } else {
+          console.log('[DailyScan] Cached to Supabase');
+        }
+      }
+    } catch (cacheErr) {
+      console.warn('[DailyScan] Supabase cache failed:', cacheErr);
+    }
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('[DailyScan] Error:', error);
     return NextResponse.json(

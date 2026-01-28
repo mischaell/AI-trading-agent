@@ -82,6 +82,11 @@ if (!data.expectedField) throw new Error("Invalid response structure");
 // Only now use the data
 ```
 
+## Bug Tracking
+
+- **Every bug fix must be documented in `BUGS.md`** with: file, issue description, root cause, fix applied, and date. No exceptions.
+- **Every test written must be documented in `test.md`** with: test name, category, what it verifies, and pass/fail status.
+
 ## Testing
 
 ```bash

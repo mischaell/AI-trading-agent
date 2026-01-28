@@ -428,6 +428,59 @@ export async function isFocusListCacheFresh(): Promise<boolean> {
 }
 
 // =============================================================================
+// DAILY SCAN CACHE
+// =============================================================================
+
+export interface DailyScanCacheRow {
+  scan_date: string;
+  scan_timestamp: string;
+  stats: Record<string, number>;
+  liquid_leaders: Array<{
+    ticker: string;
+    name: string;
+    rs: number;
+    price: number;
+    liquidityM: number;
+    volumeM: number;
+    marketCapB: number;
+    adrPct: number;
+    is21EmaAdvancing: boolean;
+    is10WmaAdvancing: boolean;
+  }>;
+  all_passed: Array<{
+    ticker: string;
+    name: string;
+    rs: number;
+    price: number;
+    liquidityM: number;
+    volumeM: number;
+    marketCapB: number;
+    adrPct: number;
+    is21EmaAdvancing: boolean;
+    is10WmaAdvancing: boolean;
+  }>;
+  elapsed: string;
+  created_at: string;
+}
+
+/**
+ * Get most recent daily scan cache
+ */
+export async function getDailyScanCache(): Promise<DailyScanCacheRow | null> {
+  requireSupabase();
+
+  const { data, error } = await supabase
+    .from('daily_scan_cache')
+    .select('*')
+    .order('scan_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return data;
+}
+
+// =============================================================================
 // UTILITY EXPORTS
 // =============================================================================
 

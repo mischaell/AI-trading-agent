@@ -106,6 +106,7 @@ import {
   updatePosition,
   deletePosition,
   getPositionByTicker,
+  getDailyScanCache,
   getTodayDate,
   PositionRow,
   PositionInsert,
@@ -1312,10 +1313,30 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       console.log(`[Pipeline] Task 2: Using cached daily scan (${dailyScanResults.length} liquid leaders)`);
       await notify('Task 2', 'running', 15, `Using cached scan: ${dailyScanResults.length} liquid leaders`);
     } else if (skipDailyScan) {
-      // Skip daily scan on initial load - use empty results
-      console.log('[Pipeline] Task 2: SKIPPING daily scan (no cache, skipDailyScan=true)');
-      await notify('Task 2', 'running', 15, 'No cached data. Click EOD Refresh to load.');
-      dailyScanResults = [];
+      // No localStorage cache — try Supabase daily_scan_cache
+      console.log('[Pipeline] Task 2: No local cache, checking Supabase daily_scan_cache...');
+      await notify('Task 2', 'running', 12, 'Loading from Supabase cache...');
+
+      try {
+        const sbCache = await getDailyScanCache();
+        if (sbCache && Array.isArray(sbCache.liquid_leaders) && sbCache.liquid_leaders.length > 0) {
+          dailyScanResults = sbCache.liquid_leaders;
+          // Persist to localStorage so next load is instant
+          const cacheEntry = { data: dailyScanResults, timestamp: Date.now() };
+          pipelineCache.dailyScan = cacheEntry;
+          saveDailyScanToStorage(cacheEntry);
+          console.log(`[Pipeline] Task 2: Loaded ${dailyScanResults.length} liquid leaders from Supabase cache (${sbCache.scan_date})`);
+          await notify('Task 2', 'running', 15, `Supabase cache: ${dailyScanResults.length} liquid leaders (${sbCache.scan_date})`);
+        } else {
+          console.log('[Pipeline] Task 2: Supabase cache empty or missing');
+          await notify('Task 2', 'running', 15, 'No cached data. Click EOD Refresh to load.');
+          dailyScanResults = [];
+        }
+      } catch (err) {
+        console.warn('[Pipeline] Task 2: Supabase cache lookup failed:', err);
+        await notify('Task 2', 'running', 15, 'No cached data. Click EOD Refresh to load.');
+        dailyScanResults = [];
+      }
     } else {
       // Need to run daily scan - this takes 2-3 minutes
       console.log('[Pipeline] Task 2: NO CACHE AND skipDailyScan=false, running full scan...');

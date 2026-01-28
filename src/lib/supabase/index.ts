@@ -67,5 +67,11 @@ export {
   isFocusListCacheFresh,
 } from './queries';
 
+// Queries - Daily Scan Cache
+export {
+  getDailyScanCache,
+} from './queries';
+export type { DailyScanCacheRow } from './queries';
+
 // Utilities
 export { getTodayDate } from './queries';
