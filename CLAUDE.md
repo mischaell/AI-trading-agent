@@ -82,6 +82,10 @@ if (!data.expectedField) throw new Error("Invalid response structure");
 // Only now use the data
 ```
 
+## Code Style
+
+- **Keep things simple.** Do not create abstractions, helpers, utilities, or patterns unless explicitly asked. Three similar lines of code is better than a premature abstraction. Solve the problem directly.
+
 ## Bug Tracking
 
 - **Every bug fix must be documented in `BUGS.md`** with: file, issue description, root cause, fix applied, and date. No exceptions.
