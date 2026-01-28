@@ -1423,6 +1423,7 @@ function ViewMarketState({ state }: { state: AgentState }) {
           </CardContent>
         </Card>
       </div>
+      <div className="mt-2 text-right text-[10px] text-zinc-400">Scanned {state.timestamp ? new Date(state.timestamp).toLocaleString() : '—'}</div>
     </div>
   );
 }
@@ -1508,6 +1509,7 @@ function ViewLiquidLeaders({ state, onTickerClick }: { state: AgentState; onTick
           </div>
         </div>
       </div>
+      <div className="mt-2 text-right text-[10px] text-zinc-400">Scanned {state.timestamp ? new Date(state.timestamp).toLocaleString() : '—'}</div>
     </div>
   );
 }
@@ -1613,6 +1615,7 @@ function ViewPullbackScan({ state, onTickerClick }: { state: AgentState; onTicke
           </div>
         </div>
       </div>
+      <div className="mt-2 text-right text-[10px] text-zinc-400">Scanned {state.timestamp ? new Date(state.timestamp).toLocaleString() : '—'}</div>
     </div>
   );
 }
@@ -1722,6 +1725,7 @@ function ViewFocusList({ state, onTickerClick }: { state: AgentState; onTickerCl
           </div>
         </CardContent>
       </Card>
+      <div className="mt-2 text-right text-[10px] text-zinc-400">Scanned {state.timestamp ? new Date(state.timestamp).toLocaleString() : '—'}</div>
     </div>
   );
 }
@@ -2227,6 +2231,7 @@ function ViewSuggestedTrades({
           </div>
         </CardContent>
       </Card>
+      <div className="mt-2 text-right text-[10px] text-zinc-400">Scanned {state.timestamp ? new Date(state.timestamp).toLocaleString() : '—'}</div>
     </div>
   );
 }
@@ -2342,6 +2347,7 @@ function ViewTradesToday({ state, onTickerClick }: { state: AgentState; onTicker
           </div>
         </CardContent>
       </Card>
+      <div className="mt-2 text-right text-[10px] text-zinc-400">Scanned {state.timestamp ? new Date(state.timestamp).toLocaleString() : '—'}</div>
     </div>
   );
 }
@@ -2713,6 +2719,7 @@ function ViewPortfolio({
           </div>
         </CardContent>
       </Card>
+      <div className="mt-2 text-right text-[10px] text-zinc-400">Scanned {state.timestamp ? new Date(state.timestamp).toLocaleString() : '—'}</div>
     </div>
   );
 }
