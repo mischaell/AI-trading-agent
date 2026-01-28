@@ -18,10 +18,10 @@
       "maxDuration": 30
     },
     "src/app/api/daily-scan/route.ts": {
-      "maxDuration": 900
+      "maxDuration": 300
     },
     "src/app/api/cron/nightly-scan/route.ts": {
-      "maxDuration": 900
+      "maxDuration": 300
     }
   },
   "crons": [
