@@ -1432,6 +1432,7 @@ function ViewMarketState({ state }: { state: AgentState }) {
 function ViewLiquidLeaders({ state, onTickerClick }: { state: AgentState; onTickerClick?: (ticker: string) => void }) {
   const universe = state.universe;
   const leaders = universe.leaders ?? [];
+  const topIdeasSet = new Set(state.topIdeas?.tickers ?? []);
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4">
@@ -1480,6 +1481,9 @@ function ViewLiquidLeaders({ state, onTickerClick }: { state: AgentState; onTick
                       ) : (
                         <span className="font-semibold text-zinc-900">{r.ticker}</span>
                       )}
+                      {topIdeasSet.has(r.ticker) && (
+                        <span className="ml-1 text-purple-600 text-[10px] font-medium">★ Top</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       <Pill tone={gradeTone}>{r.grade ?? '—'}</Pill>
@@ -1518,6 +1522,7 @@ function ViewLiquidLeaders({ state, onTickerClick }: { state: AgentState; onTick
 function ViewPullbackScan({ state, onTickerClick }: { state: AgentState; onTickerClick?: (ticker: string) => void }) {
   const pullbacks = state.pullbacks;
   const marketState = state.marketState;
+  const topIdeasSet = new Set(state.topIdeas?.tickers ?? []);
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4">
@@ -1583,6 +1588,9 @@ function ViewPullbackScan({ state, onTickerClick }: { state: AgentState; onTicke
                       ) : (
                         <span className="font-semibold text-zinc-900">{r.ticker}</span>
                       )}
+                      {topIdeasSet.has(r.ticker) && (
+                        <span className="ml-1 text-purple-600 text-[10px] font-medium">★ Top</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       <Pill tone={gradeTone}>{r.grade ?? '—'}</Pill>
@@ -1624,6 +1632,7 @@ function ViewPullbackScan({ state, onTickerClick }: { state: AgentState; onTicke
 function ViewFocusList({ state, onTickerClick }: { state: AgentState; onTickerClick?: (ticker: string) => void }) {
   const focusList = state.focusList;
   const marketState = state.marketState;
+  const topIdeasSet = new Set(state.topIdeas?.tickers ?? []);
 
   // Show all candidates (up to 10 from focus list ranking)
   const candidates = focusList.candidates ?? [];
@@ -1679,6 +1688,9 @@ function ViewFocusList({ state, onTickerClick }: { state: AgentState; onTickerCl
                             <ClickableTicker ticker={c.ticker} onClick={onTickerClick} />
                           ) : (
                             <span className="font-semibold text-zinc-900">{c.ticker}</span>
+                          )}
+                          {topIdeasSet.has(c.ticker) && (
+                            <span className="ml-1 text-purple-600 text-[10px] font-medium">★ Top</span>
                           )}
                         </div>
                         <div className="text-xs text-zinc-500">{c.theme}</div>
@@ -1744,6 +1756,7 @@ function ViewSuggestedTrades({
 }) {
   const plan = state.executionPlan;
   const marketState = state.marketState;
+  const topIdeasSet = new Set(state.topIdeas?.tickers ?? []);
   const { passed, withheld, totals } = plan;
   const trimRecommendations = state.portfolio?.trim_recommendations ?? [];
   // Get all sizing candidates - ONLY show PASS candidates (no withheld)
@@ -1977,6 +1990,9 @@ function ViewSuggestedTrades({
                               <ClickableTicker ticker={sizing.ticker} onClick={onTickerClick} />
                             ) : (
                               <span className="font-semibold">{sizing.ticker}</span>
+                            )}
+                            {topIdeasSet.has(sizing.ticker) && (
+                              <span className="ml-1 text-purple-600 text-[10px] font-medium">★ Top</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right font-mono">
