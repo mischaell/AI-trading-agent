@@ -73,5 +73,11 @@ export {
 } from './queries';
 export type { DailyScanCacheRow } from './queries';
 
+// Queries - Daily Reports (Newsletter)
+export {
+  getLatestDailyReport,
+} from './queries';
+export type { DailyReportRow } from './queries';
+
 // Utilities
 export { getTodayDate } from './queries';

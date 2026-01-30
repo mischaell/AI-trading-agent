@@ -481,6 +481,38 @@ export async function getDailyScanCache(): Promise<DailyScanCacheRow | null> {
 }
 
 // =============================================================================
+// DAILY REPORTS (Newsletter)
+// =============================================================================
+
+export interface DailyReportRow {
+  id: string;
+  report_date: string;
+  universe_tickers: string[] | null;
+  pullback_candidates: string[] | null;
+  universe_count: number | null;
+  pullback_count: number | null;
+  created_at: string;
+}
+
+/**
+ * Get the most recent daily report with universe_tickers populated
+ */
+export async function getLatestDailyReport(): Promise<DailyReportRow | null> {
+  requireSupabase();
+
+  const { data, error } = await supabase
+    .from('daily_reports')
+    .select('id, report_date, universe_tickers, pullback_candidates, universe_count, pullback_count, created_at')
+    .not('universe_tickers', 'is', null)
+    .order('report_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return data;
+}
+
+// =============================================================================
 // UTILITY EXPORTS
 // =============================================================================
 

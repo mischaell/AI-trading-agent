@@ -22,12 +22,19 @@
     },
     "src/app/api/cron/nightly-scan/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/gmail-import/route.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/cron/nightly-scan",
       "schedule": "0 2 * * 1-5"
+    },
+    {
+      "path": "/api/cron/gmail-import",
+      "schedule": "0 4 * * 2-6"
     }
   ]
 }

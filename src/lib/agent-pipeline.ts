@@ -107,6 +107,7 @@ import {
   deletePosition,
   getPositionByTicker,
   getDailyScanCache,
+  getLatestDailyReport,
   getTodayDate,
   PositionRow,
   PositionInsert,
@@ -148,6 +149,8 @@ export interface AgentState {
   overview: OverviewOutput;
   /** Timestamp when pipeline was run */
   timestamp: string;
+  /** Source of universe tickers */
+  universeSource?: { type: 'newsletter' | 'scan'; date: string; count: number };
 }
 
 /**
@@ -1360,12 +1363,70 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
 
     let dailyScanResults: DailyScanResult[];
     let universeItemData: Map<string, UniverseDataItem> = new Map();
+    let universeSource: AgentState['universeSource'] = undefined;
+
+    // ── Try Alex's Newsletter first ──
+    let newsletterTickers: string[] | null = null;
+    try {
+      const report = await getLatestDailyReport();
+      if (report && Array.isArray(report.universe_tickers) && report.universe_tickers.length > 20) {
+        newsletterTickers = report.universe_tickers;
+        console.log(`[Pipeline] Task 2: Using Alex's newsletter (${newsletterTickers.length} tickers, ${report.report_date})`);
+        await notify('Task 2', 'running', 15, `Using Alex's Liquid Leaders (${newsletterTickers.length} tickers, ${report.report_date})`);
+        universeSource = { type: 'newsletter', date: report.report_date, count: newsletterTickers.length };
+      }
+    } catch (err) {
+      console.warn('[Pipeline] Task 2: Newsletter lookup failed:', err);
+    }
 
     // Check if we have cached daily scan results
     const cacheValid = isDailyCacheValid(pipelineCache.dailyScan);
-    console.log(`[Pipeline] Task 2: cacheValid=${cacheValid}, skipDailyScan=${skipDailyScan}`);
+    console.log(`[Pipeline] Task 2: cacheValid=${cacheValid}, skipDailyScan=${skipDailyScan}, newsletter=${!!newsletterTickers}`);
 
-    if (cacheValid) {
+    if (newsletterTickers) {
+      // Newsletter path: fetch RS + universe data for Alex's tickers
+      await notify('Task 2', 'running', 12, `Fetching data for ${newsletterTickers.length} newsletter tickers...`);
+      const rsDataMap = await fetchRSData(newsletterTickers);
+
+      for (let i = 0; i < newsletterTickers.length; i += 20) {
+        const batch = newsletterTickers.slice(i, i + 20);
+        try {
+          const response = await fetch(`${BASE_URL}/api/universe-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tickers: batch }),
+          });
+          const result = await response.json() as { success: boolean; data?: UniverseDataItem[] };
+          if (result.success && Array.isArray(result.data)) {
+            for (const item of result.data) {
+              universeItemData.set(item.ticker, item);
+            }
+          }
+        } catch {
+          // Continue on error
+        }
+        if (i + 20 < newsletterTickers.length) await delay(200);
+      }
+
+      dailyScanResults = [];
+      for (const ticker of newsletterTickers) {
+        const rs = rsDataMap.get(ticker);
+        const univ = universeItemData.get(ticker);
+        dailyScanResults.push({
+          ticker,
+          name: ticker,
+          rs: rs?.rs ?? 50,
+          price: univ?.price ?? 0,
+          liquidityM: univ?.liquidityM ?? 0,
+          volumeM: univ?.volumeM ?? 0,
+          marketCapB: univ?.marketCapB ?? 0,
+          adrPct: univ?.adrPct ?? 0,
+          is21EmaAdvancing: univ?.is21EmaAdvancing ?? false,
+          is10WmaAdvancing: univ?.is10WmaAdvancing ?? false,
+        });
+      }
+      dailyScanResults.sort((a, b) => b.rs - a.rs);
+    } else if (cacheValid) {
       dailyScanResults = pipelineCache.dailyScan!.data;
       console.log(`[Pipeline] Task 2: Using cached daily scan (${dailyScanResults.length} liquid leaders)`);
       await notify('Task 2', 'running', 15, `Using cached scan: ${dailyScanResults.length} liquid leaders`);
@@ -1487,6 +1548,10 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       });
     }
     pipelineCache.universeData = { data: universeItemData, timestamp: Date.now() };
+
+    if (!universeSource) {
+      universeSource = { type: 'scan', date: today, count: dailyScanResults.length };
+    }
 
     // Build TickerData from daily scan results
     const tickerDataForScan: TickerData[] = dailyScanResults.map(stock => ({
@@ -1925,6 +1990,7 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       portfolio,
       overview,
       timestamp: new Date().toISOString(),
+      universeSource,
     };
 
     saveAgentStateToStorage(result);

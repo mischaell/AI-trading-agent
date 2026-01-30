@@ -3047,6 +3047,14 @@ export default function TradingAgentDashboard() {
           {cronStatus.ran ? '\u2705' : '\u26A0\uFE0F'} {cronStatus.label}
         </div>
       )}
+      {agentState?.universeSource && (
+        <div className={`px-4 py-1 text-xs ${agentState.universeSource.type === 'newsletter' ? 'text-blue-600' : 'text-gray-500'}`}>
+          {agentState.universeSource.type === 'newsletter' ? '📰' : '🔍'}{' '}
+          Universe: {agentState.universeSource.type === 'newsletter'
+            ? `Alex's Newsletter (${agentState.universeSource.date}, ${agentState.universeSource.count} tickers)`
+            : `Nightly Scan (${agentState.universeSource.count} tickers)`}
+        </div>
+      )}
 
       {loading ? (
         <LoadingSpinner progress={pipelineProgress} />
