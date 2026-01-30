@@ -1367,11 +1367,14 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
 
     // ── Try Alex's Newsletter first ──
     let newsletterTickers: string[] | null = null;
+    let newsletterPullbacks: string[] | null = null;
     try {
       const report = await getLatestDailyReport();
       if (report && Array.isArray(report.universe_tickers) && report.universe_tickers.length > 20) {
         newsletterTickers = report.universe_tickers;
+        newsletterPullbacks = report.pullback_candidates;
         console.log(`[Pipeline] Task 2: Using Alex's newsletter (${newsletterTickers.length} tickers, ${report.report_date})`);
+        console.log(`[Pipeline] Task 2: Newsletter pullback candidates: ${newsletterPullbacks?.join(', ') ?? 'none'}`);
         await notify('Task 2', 'running', 15, `Using Alex's Liquid Leaders (${newsletterTickers.length} tickers, ${report.report_date})`);
         universeSource = { type: 'newsletter', date: report.report_date, count: newsletterTickers.length };
       }
@@ -1624,6 +1627,27 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
         await notify('Task 3', 'running', progress, `Analyzed ${Math.min(i + BATCH_SIZE, leaders.length)}/${leaders.length} tickers`);
       }
 
+      // Fetch structure data for newsletter pullback candidates not in universe
+      if (newsletterPullbacks) {
+        const missing = newsletterPullbacks.filter(t => !structureData.has(t));
+        if (missing.length > 0) {
+          console.log(`[Pipeline] Task 3: Fetching structure for ${missing.length} newsletter pullback tickers not in universe`);
+          for (let i = 0; i < missing.length; i += BATCH_SIZE) {
+            const batch = missing.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(async (ticker) => {
+              const ohlc = await fetchOHLCData(ticker, 60);
+              const structure = analyzeTickerStructure(ticker, ohlc);
+              return { ticker, structure };
+            });
+            const batchResults = await Promise.all(batchPromises);
+            for (const { ticker, structure } of batchResults) {
+              if (structure) structureData.set(ticker, structure);
+            }
+            if (i + BATCH_SIZE < missing.length) await delay(500);
+          }
+        }
+      }
+
       pipelineCache.structureData = { data: structureData, timestamp: Date.now() };
       console.log(`[Pipeline] Task 3: Fetched structure data for ${structureData.size} tickers`);
     }
@@ -1674,6 +1698,52 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
         // 1-day change for sorting
         one_day_change_pct: structure.one_day_change_pct,
       });
+    }
+
+    // Ensure newsletter pullback candidates are included (bypass technical filters)
+    if (newsletterPullbacks && newsletterPullbacks.length > 0) {
+      const existingTickers = new Set(pullbackCandidates.map(c => c.ticker));
+      let added = 0;
+      for (const ticker of newsletterPullbacks) {
+        if (existingTickers.has(ticker)) continue;
+        const structure = structureData.get(ticker);
+        const rs = rsData.get(ticker);
+        const univItem = universeItemData.get(ticker);
+        if (!structure) continue; // No OHLC data available
+        const grade = calculateReadyGrade(
+          structure.dist_21ema_atr,
+          structure.close_range_pct,
+          structure.is_contracting,
+          structure.weekly_return_pct
+        );
+        pullbackCandidates.push({
+          rank: pullbackCandidates.length + 1,
+          ticker,
+          rs: rs?.rs ?? 50,
+          adr_pct: univItem?.adrPct ?? 3.0,
+          liquidity_m: univItem?.liquidityM ?? 500,
+          theme: TICKER_THEMES[ticker] || 'Unknown',
+          price: structure.close,
+          dist_21ema_atr: structure.dist_21ema_atr,
+          earnings_days: 30,
+          dist_50ema_atr: structure.dist_50ema_atr,
+          close_range_pct: structure.close_range_pct,
+          is_contracting: structure.is_contracting,
+          weekly_return_pct: structure.weekly_return_pct,
+          atr: structure.atr14,
+          ema21_high: structure.ema21_high,
+          ema21_close: structure.ema21_close,
+          ema21_low: structure.ema21_low,
+          close: structure.close,
+          is_21ema_advancing: univItem?.is21EmaAdvancing,
+          is_10wma_advancing: univItem?.is10WmaAdvancing,
+          one_day_change_pct: structure.one_day_change_pct,
+        });
+        added++;
+      }
+      if (added > 0) {
+        console.log(`[Pipeline] Task 3: Added ${added} newsletter pullback candidates (bypassed filters)`);
+      }
     }
 
     const pullbacks = scanPullbackCandidates(pullbackCandidates, AGGRESSIVE_PULLBACK_CRITERIA);
