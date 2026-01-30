@@ -24,7 +24,8 @@ import { PortfolioPosition, TrimRecommendation } from "@/types";
 import { PositionCard, OrderTicketCard, TrimCard, FocusCandidateCard } from "@/components/mobile-cards";
 
 // Pipeline imports
-import { runAgentPipeline, AgentState, saveTradeToDatabase, TradeInput, PipelineProgress, clearPipelineCache, clearQuickCache, refreshPortfolioOnly } from "@/lib/agent-pipeline";
+import { runAgentPipeline, AgentState, saveTradeToDatabase, TradeInput, PipelineProgress, clearPipelineCache, clearQuickCache, refreshPortfolioOnly, loadCachedAgentState } from "@/lib/agent-pipeline";
+import { getDailyScanCache } from "@/lib/supabase";
 import { calculateTradeStats } from "@/tasks/overview";
 
 // =============================================================================
@@ -2734,6 +2735,7 @@ export default function TradingAgentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pipelineProgress, setPipelineProgress] = useState<PipelineProgress | null>(null);
+  const [cronStatus, setCronStatus] = useState<{ ran: boolean; label: string } | null>(null);
 
   // Ticker chart modal state
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
@@ -2884,14 +2886,50 @@ export default function TradingAgentDashboard() {
     setIsEditingEquity(false);
   };
 
-  // Run pipeline on mount - use cached data only (no full scan)
+  // Run pipeline on mount - try cached AgentState first for instant load
   useEffect(() => {
+    // Check cron status in parallel (non-blocking)
+    const checkCronStatus = async () => {
+      try {
+        const row = await getDailyScanCache();
+        if (row) {
+          const scanDate = row.scan_date;
+          const today = new Date().toISOString().slice(0, 10);
+          const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+          const ran = scanDate === today || scanDate === yesterday;
+          const time = new Date(row.scan_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+          setCronStatus({
+            ran,
+            label: ran
+              ? `Nightly scan: ran ${scanDate} at ${time} UTC`
+              : `Nightly scan did not run (last: ${scanDate})`,
+          });
+        } else {
+          setCronStatus({ ran: false, label: 'Nightly scan: no data found' });
+        }
+      } catch (err) {
+        console.warn('[Dashboard] Failed to check cron status:', err);
+        setCronStatus({ ran: false, label: 'Nightly scan: unable to check' });
+      }
+    };
+    checkCronStatus();
+
+    // Try loading cached AgentState for instant render
+    const cached = loadCachedAgentState();
+    if (cached) {
+      console.log('[Dashboard] Loaded from AgentState cache, skipping pipeline');
+      setAgentState(cached);
+      setLoading(false);
+      return;
+    }
+
+    // No cache — run pipeline
     const runPipeline = async () => {
       try {
         const state = await runAgentPipeline({
           equity: accountEquity,
-          cash: accountEquity, // Will be recalculated based on positions
-          skipDailyScan: true, // Don't run full Nasdaq scan on initial load
+          cash: accountEquity,
+          skipDailyScan: true,
           onProgress: (progress) => {
             setPipelineProgress({ ...progress });
           },
@@ -3004,6 +3042,11 @@ export default function TradingAgentDashboard() {
         onEodRefresh={handleEodRefresh}
         onQuickRefresh={handleQuickRefresh}
       />
+      {cronStatus && (
+        <div className={`px-4 py-1 text-xs ${cronStatus.ran ? 'text-green-600' : 'text-amber-600'}`}>
+          {cronStatus.ran ? '\u2705' : '\u26A0\uFE0F'} {cronStatus.label}
+        </div>
+      )}
 
       {loading ? (
         <LoadingSpinner progress={pipelineProgress} />

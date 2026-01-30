@@ -268,6 +268,62 @@ interface DailyScanResult {
 const DAILY_CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DAILY_SCAN_STORAGE_KEY = 'pipeline_daily_scan_cache';
 
+// =============================================================================
+// Full AgentState Cache (localStorage, 24hr TTL)
+// =============================================================================
+
+const AGENT_STATE_CACHE_KEY = 'pipeline_agent_state_cache';
+const AGENT_STATE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface AgentStateCacheEntry {
+  state: AgentState;
+  timestamp: number;
+}
+
+function loadAgentStateFromStorage(): AgentState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem(AGENT_STATE_CACHE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as AgentStateCacheEntry;
+    if (Date.now() - parsed.timestamp >= AGENT_STATE_TTL_MS) {
+      localStorage.removeItem(AGENT_STATE_CACHE_KEY);
+      console.log('[Pipeline] AgentState cache expired, will run pipeline');
+      return null;
+    }
+    const ageMin = Math.round((Date.now() - parsed.timestamp) / 60000);
+    console.log(`[Pipeline] Loaded AgentState from cache (${ageMin}min old)`);
+    return parsed.state;
+  } catch (err) {
+    console.warn('[Pipeline] Failed to load AgentState cache:', err);
+    return null;
+  }
+}
+
+function saveAgentStateToStorage(state: AgentState): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const entry: AgentStateCacheEntry = { state, timestamp: Date.now() };
+    localStorage.setItem(AGENT_STATE_CACHE_KEY, JSON.stringify(entry));
+    console.log('[Pipeline] AgentState saved to cache');
+  } catch (err) {
+    console.warn('[Pipeline] Failed to save AgentState cache:', err);
+  }
+}
+
+function clearAgentStateFromStorage(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(AGENT_STATE_CACHE_KEY);
+}
+
+/**
+ * Load cached AgentState from localStorage if fresh (< 24hr).
+ * Returns null if stale or missing.
+ */
+export function loadCachedAgentState(): AgentState | null {
+  return loadAgentStateFromStorage();
+}
+
 const pipelineCache: {
   rsData: CacheEntry<Map<string, RSData>> | null;
   universeData: CacheEntry<Map<string, UniverseDataItem>> | null;
@@ -352,6 +408,7 @@ export function clearPipelineCache(): void {
   pipelineCache.earningsData = null;
   pipelineCache.dailyScan = null;
   clearDailyScanFromStorage(); // Also clear localStorage
+  clearAgentStateFromStorage(); // Also clear full AgentState cache
   console.log('[Pipeline] Cache cleared (full, including storage)');
 }
 
@@ -1857,7 +1914,7 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[Pipeline] Complete in ${elapsed}s`);
 
-    return {
+    const result: AgentState = {
       marketState,
       universe,
       pullbacks,
@@ -1869,6 +1926,10 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       overview,
       timestamp: new Date().toISOString(),
     };
+
+    saveAgentStateToStorage(result);
+
+    return result;
   } catch (error) {
     console.error('[Pipeline] FATAL ERROR:', error);
     onProgress?.({ task: 'Pipeline', status: 'error', progress: 0, message: String(error) });
