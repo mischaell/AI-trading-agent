@@ -362,3 +362,66 @@ curl https://ai-trading-agent-lake.vercel.app/api/diagnostics | jq .
 | `src/tasks/__tests__/pipeline-diagnostics.ts` | Mock data quality validation for all 9 tasks |
 | `src/app/api/diagnostics/route.ts` | Live health check endpoint (Supabase caches, cron, fallbacks) |
 | `docs/PIPELINE-DIAGNOSTICS.md` | Full documentation of dependencies, caches, fallbacks |
+
+---
+
+# AgentState Cache & Cron Status Tests
+
+**Date:** 2026-01-30
+**Status:** All 5 tests PASSED (manual via Chrome DevTools MCP)
+
+## Purpose
+
+Validates that the full AgentState is cached in localStorage for instant dashboard load on subsequent visits, and that the nightly cron status indicator works correctly.
+
+## Test Summary
+
+| # | Test Name | Category | What it verifies | Status |
+|---|-----------|----------|-----------------|--------|
+| 1 | First load runs pipeline and saves cache | Cache | Empty localStorage triggers full pipeline; `AgentState saved to cache` appears in console | PASS |
+| 2 | Reload loads from cache, skips pipeline | Cache | `Loaded AgentState from cache (Xmin old)` + `Loaded from AgentState cache, skipping pipeline` in console; zero pipeline task logs | PASS |
+| 3 | Dashboard renders correctly from cache | Cache | All UI elements (market state, chart, nav, positions) render identically from cache as from pipeline | PASS |
+| 4 | Cron status indicator displays | Cron | Green indicator shows "Nightly scan: ran 2026-01-30 at 02:41 UTC" below MarketStateStrip | PASS |
+| 5 | Production deploy works with cache | E2E | Deployed to Vercel, first load runs pipeline, reload hits cache — verified on `ai-trading-agent-lake.vercel.app` | PASS |
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/lib/agent-pipeline.ts` | Added `loadCachedAgentState()`, `saveAgentStateToStorage()`, `clearAgentStateFromStorage()` with 24hr TTL; saves state at end of `runAgentPipeline()`; clears in `clearPipelineCache()` |
+| `src/views/dashboard.tsx` | Mount `useEffect` tries cache first for instant render; cron status check runs in parallel via `getDailyScanCache()`; cron indicator rendered below MarketStateStrip |
+
+## How to Test
+
+```bash
+# 1. Start dev server
+npm run dev
+
+# 2. Open http://localhost:3000 in Chrome
+#    - Check console for "[Pipeline] AgentState saved to cache"
+
+# 3. Reload the page
+#    - Check console for "[Pipeline] Loaded AgentState from cache (Xmin old)"
+#    - Check console for "[Dashboard] Loaded from AgentState cache, skipping pipeline"
+#    - Verify NO pipeline task logs appear
+
+# 4. Check cron indicator visible below market state strip
+
+# 5. Clear localStorage and reload to re-trigger pipeline
+```
+
+## Console Output (First Load)
+
+```
+[Pipeline] Starting pipeline with real data...
+... (pipeline tasks 1-9) ...
+[Pipeline] Complete in 11.5s
+[Pipeline] AgentState saved to cache
+```
+
+## Console Output (Reload — Cache Hit)
+
+```
+[Pipeline] Loaded AgentState from cache (0min old)
+[Dashboard] Loaded from AgentState cache, skipping pipeline
+```
