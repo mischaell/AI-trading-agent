@@ -127,6 +127,19 @@ const TICKER_EXCLUSIONS = new Set([
   "LET", "PUT", "SAY", "SHE", "TOO", "USE", "QQQE", "MCO", "MCSI", "TLMM",
   "DMA", "EMA", "ATR", "SSL", "HIGH", "LOW", "OPEN", "CLOSE", "BTC", "ETH",
   "SPY", "QQQ", "IWM", "DIA", "VIX", "USD", "EUR", "GBP", "JPY", "CAD",
+  // Substack boilerplate words that match ticker pattern
+  "SWING", "POD", "FREE", "PRICE", "VIEW", "WILL", "ALSO", "BEEN", "COME",
+  "EACH", "FROM", "HAVE", "HERE", "INTO", "JUST", "LIKE", "MAKE",
+  "MANY", "MORE", "MOST", "MUCH", "MUST", "NEED", "ONLY", "OVER", "SUCH",
+  "TAKE", "THAN", "THEM", "THEN", "VERY", "WANT", "WHAT", "WHEN", "WITH",
+  "YOUR", "THIS", "THAT", "BEEN", "SOME", "WERE", "THEY", "KEEP", "ALSO",
+  "BACK", "EVEN", "GIVE", "GOOD", "JUST", "KNOW", "LOOK", "MADE", "MOVE",
+  "PART", "SAME", "TELL", "TURN", "WELL", "WORK", "YEAR", "BEST", "BOTH",
+  "DOWN", "FIND", "HAND", "HELP", "LAST", "LEFT", "LIFE", "LINE", "LIST",
+  "LIVE", "MARK", "MIND", "NEXT", "PLAN", "PLAY", "REAL", "SHOW", "SIDE",
+  "SIGN", "TIME", "UPON", "USED", "WEEK",
+  // Words from newsletter section headers
+  "DAILY", "TOP", "IDEAS", "HEAT", "MAP", "SCAN", "READ", "APP", "IN",
 ]);
 
 // Known valid tickers in Nasdaq-100 (for validation)
@@ -363,8 +376,9 @@ const SECTION_HEADERS = {
   market_internals: /MARKET\s*INTERNALS/i,
   credit_spreads: /Credit\s*Spreads\s*\(SHY\/HYG\)/i,
   btc: /#?BTC\s*\(Bitcoin\)/i,
+  liquid_leaders_universe: /Liquid\s*Leaders\s*Universe\s*\(?top\s*RS\)?/i,
   liquid_leaders_rs: /Liquid\s*Leaders\s*(?:sorted\s*)?by\s*1-Day\s*(?:Return|RS)/i,
-  pullback_scan: /Liquid\s*Leaders\s*DAILY-structure\s*Pullback\s*scan/i,
+  pullback_scan: /Liquid\s*Leaders\s*DAILY[\s-]*structure\s*Pullback\s*scan/i,
 };
 
 /**
@@ -494,21 +508,38 @@ function extractBtcText(text: string): string {
  * Extract Liquid Leaders tickers from the "sorted by 1-Day Return" section
  */
 function extractLiquidLeadersTickers(text: string): string[] {
-  const sectionText = extractSectionText(
+  // Try "Liquid Leaders Universe (top RS)" first (current Substack format)
+  const universeText = extractSectionText(
+    text,
+    SECTION_HEADERS.liquid_leaders_universe,
+    [SECTION_HEADERS.liquid_leaders_rs, SECTION_HEADERS.pullback_scan]
+  );
+
+  if (universeText) {
+    const tickers = extractTickers(universeText);
+    if (tickers.length >= 5) {
+      console.log(`[Parser] Extracted ${tickers.length} tickers from "Liquid Leaders Universe" section`);
+      return tickers;
+    }
+  }
+
+  // Try "Liquid Leaders sorted by 1-Day Return" (alternate format)
+  const rsText = extractSectionText(
     text,
     SECTION_HEADERS.liquid_leaders_rs,
     [SECTION_HEADERS.pullback_scan]
   );
 
-  if (!sectionText) {
-    console.log("[Parser] Liquid Leaders section not found, trying fallback patterns");
-    return extractUniverseTickers(text);
+  if (rsText) {
+    const tickers = extractTickers(rsText);
+    if (tickers.length >= 5) {
+      console.log(`[Parser] Extracted ${tickers.length} tickers from "Liquid Leaders by RS" section`);
+      return tickers;
+    }
   }
 
-  // Extract tickers from comma-separated list
-  const tickers = extractTickers(sectionText);
-  console.log(`[Parser] Extracted ${tickers.length} Liquid Leaders tickers from section`);
-  return tickers;
+  console.log("[Parser] Liquid Leaders section not found, trying fallback patterns");
+  return extractUniverseTickers(text);
 }
 
 /**
@@ -644,6 +675,14 @@ function stripHtml(html: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&deg;/g, "°")
+    .replace(/&#\d+;/g, " ") // Strip remaining numeric entities
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -657,12 +696,10 @@ function stripPromotionalContent(text: string): string {
 
   // Find the earliest promotional content and truncate there
   const promoMarkers = [
-    /Try\s+Traders?\s*lab/i,
     /Leader\s*Stalk\s*list/i,
     /Unsubscribe/i,
     /©\s*\d{4}/i,
     /All\s+rights\s+reserved/i,
-    /View\s+in\s+browser/i,
   ];
 
   let earliestPromoIndex = cleaned.length;
@@ -678,6 +715,42 @@ function stripPromotionalContent(text: string): string {
   }
 
   return cleaned.trim();
+}
+
+// =============================================================================
+// Substack Full Post Fetcher
+// =============================================================================
+
+/**
+ * Extract Substack post URL from email text
+ */
+function extractSubstackUrl(text: string): string | null {
+  const match = text.match(/https?:\/\/primetrading\.substack\.com\/p\/[^\s"'<>]+/i);
+  return match ? match[0] : null;
+}
+
+/**
+ * Fetch full post content from Substack URL
+ * The email only contains a preview; the Liquid Leaders section is on the website.
+ */
+async function fetchSubstackContent(url: string): Promise<string | null> {
+  try {
+    console.log(`[Parser] Fetching full Substack post: ${url}`);
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TradingAgent/1.0)' },
+    });
+    if (!response.ok) {
+      console.warn(`[Parser] Substack fetch failed: ${response.status}`);
+      return null;
+    }
+    const html = await response.text();
+    const text = stripHtml(html);
+    console.log(`[Parser] Fetched Substack content: ${text.length} chars`);
+    return text;
+  } catch (error) {
+    console.warn(`[Parser] Substack fetch error:`, error);
+    return null;
+  }
 }
 
 // =============================================================================
@@ -697,7 +770,10 @@ export async function parseReport(
   email: EmailContent,
   reportDate: string
 ): Promise<ParsedReport> {
-  const rawText = email.textBody || stripHtml(email.htmlBody);
+  // Prefer HTML-derived text — Substack text bodies are often truncated summaries
+  const htmlText = email.htmlBody ? stripHtml(email.htmlBody) : '';
+  const plainText = email.textBody || '';
+  const rawText = htmlText.length > plainText.length ? htmlText : plainText;
   // Strip promotional/footer content before parsing
   const text = stripPromotionalContent(rawText);
   const notes: string[] = [];
@@ -706,6 +782,18 @@ export async function parseReport(
   // Debug: log a snippet of the content to help understand the format
   console.log(`[Parser] Parsing report for ${reportDate}, text length: ${text.length} (stripped from ${rawText.length})`);
   console.log(`[Parser] First 500 chars: ${text.substring(0, 500).replace(/\n/g, ' ')}`);
+  // If email doesn't contain Liquid Leaders, fetch full post from Substack
+  let fullText = text;
+  if (text.toLowerCase().indexOf('liquid leaders') === -1) {
+    const substackUrl = extractSubstackUrl(rawText);
+    if (substackUrl) {
+      const substackContent = await fetchSubstackContent(substackUrl);
+      if (substackContent && substackContent.toLowerCase().includes('liquid leaders')) {
+        console.log(`[Parser] Using Substack content (has Liquid Leaders section)`);
+        fullText = stripPromotionalContent(substackContent);
+      }
+    }
+  }
 
   // Extract section text first
   const sectionTexts = {
@@ -736,8 +824,8 @@ export async function parseReport(
     mco_status: extractMcoStatus(text),
     tlmm_signal: extractTlmmSignal(text),
     tlmm_since_date: extractTlmmSinceDate(text),
-    universe_tickers: extractLiquidLeadersTickers(text),
-    pullback_candidates: extractPullbackScanTickers(text),
+    universe_tickers: extractLiquidLeadersTickers(fullText),
+    pullback_candidates: extractPullbackScanTickers(fullText),
   };
 
   // Debug: log extraction results
