@@ -25,6 +25,12 @@
     },
     "src/app/api/cron/gmail-import/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/cron/discord-gameplan/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/discord/gameplan/route.ts": {
+      "maxDuration": 30
     }
   },
   "crons": [
@@ -35,6 +41,10 @@
     {
       "path": "/api/cron/gmail-import",
       "schedule": "0 4 * * 2-6"
+    },
+    {
+      "path": "/api/cron/discord-gameplan",
+      "schedule": "30 4 * * 2-6"
     }
   ]
 }

@@ -79,5 +79,11 @@ export {
 } from './queries';
 export type { DailyReportRow } from './queries';
 
+// Queries - Top Ideas (Discord Gameplan)
+export {
+  getLatestTopIdeas,
+} from './queries';
+export type { TopIdeasRow } from './queries';
+
 // Utilities
 export { getTodayDate } from './queries';

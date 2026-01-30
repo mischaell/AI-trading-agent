@@ -3055,6 +3055,11 @@ export default function TradingAgentDashboard() {
             : `Nightly Scan (${agentState.universeSource.count} tickers)`}
         </div>
       )}
+      {agentState?.topIdeas && (
+        <div className="px-4 py-1 text-xs text-purple-600">
+          Top Ideas ({agentState.topIdeas.date}): {agentState.topIdeas.tickers.join(', ')}
+        </div>
+      )}
 
       {loading ? (
         <LoadingSpinner progress={pipelineProgress} />

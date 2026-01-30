@@ -9,7 +9,9 @@
 export * from "./equity-trades";
 export * from "./alex-journal";
 export * from "./pf-update";
+export * from "./gameplan";
 
 export { default as equityTradesParser } from "./equity-trades";
 export { default as alexJournalParser } from "./alex-journal";
 export { default as pfUpdateParser } from "./pf-update";
+export { default as gameplanParser } from "./gameplan";

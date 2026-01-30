@@ -108,6 +108,7 @@ import {
   getPositionByTicker,
   getDailyScanCache,
   getLatestDailyReport,
+  getLatestTopIdeas,
   getTodayDate,
   PositionRow,
   PositionInsert,
@@ -151,6 +152,8 @@ export interface AgentState {
   timestamp: string;
   /** Source of universe tickers */
   universeSource?: { type: 'newsletter' | 'scan'; date: string; count: number };
+  /** Top Ideas from Discord gameplan-focuslist */
+  topIdeas?: { tickers: string[]; date: string; situationalAwareness: string; gameplan: string };
 }
 
 /**
@@ -1365,6 +1368,23 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
     let universeItemData: Map<string, UniverseDataItem> = new Map();
     let universeSource: AgentState['universeSource'] = undefined;
 
+    // ── Try Top Ideas from Discord gameplan-focuslist ──
+    let topIdeas: AgentState['topIdeas'] = undefined;
+    try {
+      const ideas = await getLatestTopIdeas();
+      if (ideas && Array.isArray(ideas.top_ideas) && ideas.top_ideas.length > 0) {
+        topIdeas = {
+          tickers: ideas.top_ideas,
+          date: ideas.post_date,
+          situationalAwareness: ideas.situational_awareness || '',
+          gameplan: ideas.gameplan || '',
+        };
+        console.log(`[Pipeline] Top Ideas (${ideas.post_date}): ${ideas.top_ideas.join(', ')}`);
+      }
+    } catch (err) {
+      console.warn('[Pipeline] Top Ideas lookup failed:', err);
+    }
+
     // ── Try Alex's Newsletter first ──
     let newsletterTickers: string[] | null = null;
     let newsletterPullbacks: string[] | null = null;
@@ -2061,6 +2081,7 @@ export async function runAgentPipeline(config?: PipelineConfig): Promise<AgentSt
       overview,
       timestamp: new Date().toISOString(),
       universeSource,
+      topIdeas,
     };
 
     saveAgentStateToStorage(result);

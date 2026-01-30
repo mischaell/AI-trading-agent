@@ -513,6 +513,35 @@ export async function getLatestDailyReport(): Promise<DailyReportRow | null> {
 }
 
 // =============================================================================
+// TOP IDEAS (Discord Gameplan)
+// =============================================================================
+
+export interface TopIdeasRow {
+  top_ideas: string[];
+  post_date: string;
+  situational_awareness: string;
+  gameplan: string;
+}
+
+/**
+ * Get the most recent Top Ideas from discord_gameplan
+ */
+export async function getLatestTopIdeas(): Promise<TopIdeasRow | null> {
+  requireSupabase();
+
+  const { data, error } = await supabase
+    .from('discord_gameplan')
+    .select('top_ideas, post_date, situational_awareness, gameplan')
+    .not('top_ideas', 'is', null)
+    .order('post_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return data;
+}
+
+// =============================================================================
 // UTILITY EXPORTS
 // =============================================================================
 
