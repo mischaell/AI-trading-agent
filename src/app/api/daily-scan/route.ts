@@ -210,11 +210,27 @@ function calculateRSRankings(stocks: FilteredStock[]): void {
   });
 }
 
+// Cooldown: prevent triggering scans more than once per hour
+const SCAN_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+let lastScanTimestamp = 0;
+
 /**
  * POST /api/daily-scan
  * Runs the full daily universe scan
  */
 export async function POST() {
+  const now = Date.now();
+  if (now - lastScanTimestamp < SCAN_COOLDOWN_MS) {
+    const remainingMin = Math.ceil((SCAN_COOLDOWN_MS - (now - lastScanTimestamp)) / 60000);
+    console.warn(`[DailyScan] Cooldown active — scan blocked. Try again in ${remainingMin}min.`);
+    return NextResponse.json({
+      success: false,
+      error: `Scan cooldown active. Try again in ${remainingMin} minutes.`,
+      lastScan: new Date(lastScanTimestamp).toISOString(),
+    }, { status: 429 });
+  }
+  lastScanTimestamp = now;
+
   const startTime = Date.now();
   console.log('[DailyScan] Starting full Nasdaq universe scan...');
 

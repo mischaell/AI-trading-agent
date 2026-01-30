@@ -285,4 +285,22 @@ Applied to both `daily-scan/route.ts` and `cron/nightly-scan/route.ts`.
 
 ---
 
-*Last updated: 2026-01-28*
+## Runtime Bug #8: External Cron Service Hitting Wrong URL (405 Method Not Allowed)
+
+**File:** N/A (external service misconfiguration)
+
+**Issue:** An external cron service (cron-job.org) was configured to hit `https://ai-trading-agent-lake.vercel.app/daily-scan` which does not exist. The correct API route is `/api/daily-scan` (POST) or `/api/cron/nightly-scan` (GET). The wrong URL returned 405 Method Not Allowed, causing 26 consecutive failures and automatic disabling of the cron job.
+
+**Root cause:** The external cron-job.org service was set up with the wrong URL (`/daily-scan` instead of `/api/daily-scan`) and likely using GET instead of POST. Additionally, this external cron is redundant — Vercel Cron is already configured in `vercel.json` to call `/api/cron/nightly-scan` at `0 2 * * 1-5` (Mon-Fri 2 AM UTC), and it runs successfully.
+
+**Fix:**
+1. Disable the cron-job.org job (redundant with Vercel Cron)
+2. Added cooldown guard to `/api/daily-scan` POST to prevent accidental rapid re-triggers (minimum 1 hour between scans)
+
+**Impact:** No data loss. The Vercel Cron ran successfully at 02:41 UTC on 2026-01-30, so the nightly scan data was available. The external cron failures were harmless noise.
+
+**Date:** 2026-01-30
+
+---
+
+*Last updated: 2026-01-30*
