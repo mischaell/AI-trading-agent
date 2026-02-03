@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import type { SizingOutput } from "@/types/sizing";
 
 // =============================================================================
 // Types
@@ -10,6 +11,7 @@ interface TickerChartModalProps {
   ticker: string;
   isOpen: boolean;
   onClose: () => void;
+  sizingData?: SizingOutput;
 }
 
 interface OHLCBar {
@@ -34,6 +36,11 @@ interface StructureAnalysis {
   position: "above" | "inside" | "below";
   distanceToEma: number; // in ATR units
   entryMode: string;
+}
+
+interface CommentaryData {
+  commentary: string[];
+  tradingPlan: { action: string; price: number; gain_pct: number }[];
 }
 
 // =============================================================================
@@ -117,15 +124,19 @@ function analyzeStructure(bars: OHLCBar[]): StructureAnalysis {
 // Main Component
 // =============================================================================
 
-export function TickerChartModal({ ticker, isOpen, onClose }: TickerChartModalProps) {
+export function TickerChartModal({ ticker, isOpen, onClose, sizingData }: TickerChartModalProps) {
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [commentary, setCommentary] = useState<CommentaryData | null>(null);
+  const [commentaryLoading, setCommentaryLoading] = useState(false);
+  const [commentaryFailed, setCommentaryFailed] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Fetch data when modal opens
+  const hasCommentary = !!sizingData;
+
+  // Fetch chart data when modal opens
   const fetchChartData = useCallback(async () => {
-    // Check cache first
     const cached = chartCache.get(ticker);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
       setChartData(cached.data);
@@ -156,7 +167,6 @@ export function TickerChartModal({ ticker, isOpen, onClose }: TickerChartModalPr
         priceChangePct: ((lastBar.close - prevBar.close) / prevBar.close) * 100,
       };
 
-      // Cache the data
       chartCache.set(ticker, { data, timestamp: Date.now() });
       setChartData(data);
     } catch (err) {
@@ -166,11 +176,56 @@ export function TickerChartModal({ ticker, isOpen, onClose }: TickerChartModalPr
     }
   }, [ticker]);
 
+  // Fetch AI commentary when sizing data is available
+  const fetchCommentary = useCallback(async () => {
+    if (!sizingData) return;
+
+    setCommentaryLoading(true);
+    try {
+      const structure = chartData ? analyzeStructure(chartData.bars) : null;
+      const res = await fetch('/api/trade-commentary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticker: sizingData.ticker,
+          entry: sizingData.entry,
+          ssl: sizingData.ssl,
+          trim_2r_price: sizingData.trim_2r_price,
+          grade: sizingData.grade,
+          mode: sizingData.mode,
+          rs: sizingData.rs,
+          score: sizingData.score,
+          dist_21ema_atr: sizingData.dist_21ema_atr,
+          close_range_pct: sizingData.close_range_pct,
+          is_contracting: sizingData.is_contracting,
+          structure_position: structure?.position,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to fetch commentary');
+      const data: CommentaryData = await res.json();
+      setCommentary(data);
+    } catch (err) {
+      console.error('[TickerChartModal] Commentary fetch failed:', err);
+      setCommentaryFailed(true);
+    } finally {
+      setCommentaryLoading(false);
+    }
+  }, [sizingData, chartData]);
+
   useEffect(() => {
     if (isOpen && ticker) {
+      setCommentary(null);
+      setCommentaryFailed(false);
       fetchChartData();
     }
   }, [isOpen, ticker, fetchChartData]);
+
+  // Fetch commentary after chart data loads (needs structure analysis)
+  useEffect(() => {
+    if (isOpen && chartData && sizingData && !commentary && !commentaryLoading && !commentaryFailed) {
+      fetchCommentary();
+    }
+  }, [isOpen, chartData, sizingData, commentary, commentaryLoading, fetchCommentary]);
 
   // Keyboard support (ESC to close)
   useEffect(() => {
@@ -201,7 +256,7 @@ export function TickerChartModal({ ticker, isOpen, onClose }: TickerChartModalPr
     >
       <div
         ref={modalRef}
-        className="w-[1020px] max-w-[95vw] rounded-2xl bg-white shadow-2xl"
+        className={`${hasCommentary ? 'w-[1280px]' : 'w-[1020px]'} max-w-[95vw] rounded-2xl bg-white shadow-2xl`}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
@@ -222,6 +277,22 @@ export function TickerChartModal({ ticker, isOpen, onClose }: TickerChartModalPr
                 </div>
               </>
             )}
+            {sizingData && (
+              <div className="flex items-center gap-2 text-xs">
+                {sizingData.grade && (
+                  <span className={`rounded px-1.5 py-0.5 font-medium ${
+                    sizingData.grade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                    sizingData.grade === 'B' ? 'bg-blue-100 text-blue-700' :
+                    'bg-zinc-100 text-zinc-600'
+                  }`}>
+                    Grade {sizingData.grade}
+                  </span>
+                )}
+                {sizingData.rs != null && (
+                  <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-600">RS {sizingData.rs}</span>
+                )}
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -238,11 +309,102 @@ export function TickerChartModal({ ticker, isOpen, onClose }: TickerChartModalPr
           </button>
         </div>
 
-        {/* Chart Area */}
-        <div className="h-[480px] px-6 py-4">
-          {loading && <LoadingState />}
-          {error && <ErrorState message={error} onRetry={fetchChartData} />}
-          {chartData && !loading && !error && <ChartSVG data={chartData} />}
+        {/* Content Area */}
+        <div className={`${hasCommentary ? 'flex' : ''} h-[480px] px-6 py-4`}>
+          {/* Chart */}
+          <div className={hasCommentary ? 'w-[60%] pr-4' : 'h-full'}>
+            <div className="h-full">
+              {loading && <LoadingState />}
+              {error && <ErrorState message={error} onRetry={fetchChartData} />}
+              {chartData && !loading && !error && <ChartSVG data={chartData} />}
+            </div>
+          </div>
+
+          {/* Commentary Panel */}
+          {hasCommentary && (
+            <div className="w-[40%] border-l border-zinc-200 pl-4 overflow-y-auto">
+              {commentaryLoading ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-900" />
+                  <div className="text-xs text-zinc-400">Generating AI analysis...</div>
+                </div>
+              ) : commentary ? (
+                <div className="space-y-4">
+                  {/* AI Commentary */}
+                  <div>
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">AI Commentary</div>
+                    <ul className="space-y-2">
+                      {commentary.commentary.map((point, i) => (
+                        <li key={i} className="flex gap-2 text-sm text-zinc-700">
+                          <span className="mt-0.5 text-zinc-400">•</span>
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Trading Plan Table */}
+                  <div>
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">Trading Plan</div>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-zinc-100 text-left text-xs text-zinc-400">
+                          <th className="pb-1.5 font-medium">Action</th>
+                          <th className="pb-1.5 font-medium text-right">Price</th>
+                          <th className="pb-1.5 font-medium text-right">Gain %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {commentary.tradingPlan.map((row, i) => (
+                          <tr key={i} className="border-b border-zinc-50">
+                            <td className={`py-1.5 font-medium ${
+                              row.action.startsWith('Stop') ? 'text-red-600' :
+                              row.action.startsWith('Runner') ? 'text-emerald-600' :
+                              'text-zinc-700'
+                            }`}>
+                              {row.action}
+                            </td>
+                            <td className="py-1.5 text-right font-mono text-zinc-900">
+                              ${row.price.toFixed(2)}
+                            </td>
+                            <td className={`py-1.5 text-right font-mono ${
+                              row.gain_pct >= 0 ? 'text-emerald-600' : 'text-red-600'
+                            }`}>
+                              {row.gain_pct >= 0 ? '+' : ''}{row.gain_pct.toFixed(1)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Quick Stats */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded bg-zinc-50 p-2">
+                      <div className="text-zinc-400">Entry</div>
+                      <div className="font-mono font-medium text-zinc-900">${sizingData!.entry.toFixed(2)}</div>
+                    </div>
+                    <div className="rounded bg-zinc-50 p-2">
+                      <div className="text-zinc-400">Stop</div>
+                      <div className="font-mono font-medium text-red-600">${sizingData!.ssl.toFixed(2)}</div>
+                    </div>
+                    <div className="rounded bg-zinc-50 p-2">
+                      <div className="text-zinc-400">Shares</div>
+                      <div className="font-mono font-medium text-zinc-900">{sizingData!.shares}</div>
+                    </div>
+                    <div className="rounded bg-zinc-50 p-2">
+                      <div className="text-zinc-400">Position %</div>
+                      <div className="font-mono font-medium text-zinc-900">{sizingData!.position_percent.toFixed(1)}%</div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs text-zinc-400">
+                  Commentary unavailable
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer - Structure Analysis */}

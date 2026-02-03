@@ -1574,14 +1574,18 @@ function ViewPullbackScan({ state, onTickerClick }: { state: AgentState; onTicke
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pullbacks.candidates.map((r) => {
+              {[...pullbacks.candidates].sort((a, b) => {
+                const aTop = topIdeasSet.has(a.ticker) ? 0 : 1;
+                const bTop = topIdeasSet.has(b.ticker) ? 0 : 1;
+                return aTop - bTop;
+              }).map((r, idx) => {
                 const gradeTone = r.grade === 'A' ? 'good' : r.grade === 'B' ? 'neutral' : 'warn';
                 const modeTone = r.mode === 'MODE2' ? 'good' : 'neutral';
                 const distTone = toneForDist21(r.dist_21_atr);
                 const earnTone = r.earnings_days <= 7 ? "warn" : "neutral";
                 return (
                   <TableRow key={r.ticker}>
-                    <TableCell className="text-zinc-500">{r.rank}</TableCell>
+                    <TableCell className="text-zinc-500">{idx + 1}</TableCell>
                     <TableCell>
                       {onTickerClick ? (
                         <ClickableTicker ticker={r.ticker} onClick={onTickerClick} />
@@ -1750,7 +1754,7 @@ function ViewSuggestedTrades({
   onTradeExecuted,
 }: {
   state: AgentState;
-  onTickerClick?: (ticker: string) => void;
+  onTickerClick?: (ticker: string, sizing?: import("@/types/sizing").SizingOutput) => void;
   onTrim?: (rec: TrimRecommendation) => Promise<void>;
   onTradeExecuted?: () => void;
 }) {
@@ -1987,7 +1991,12 @@ function ViewSuggestedTrades({
                           </TableCell>
                           <TableCell className="font-mono">
                             {onTickerClick ? (
-                              <ClickableTicker ticker={sizing.ticker} onClick={onTickerClick} />
+                              <button
+                                onClick={() => onTickerClick(sizing.ticker, sizing)}
+                                className="cursor-pointer font-semibold text-zinc-900 hover:text-blue-600 hover:underline"
+                              >
+                                {sizing.ticker}
+                              </button>
                             ) : (
                               <span className="font-semibold">{sizing.ticker}</span>
                             )}
@@ -2228,7 +2237,21 @@ function ViewSuggestedTrades({
               <TableBody>
                 {withheld.map((item) => (
                   <TableRow key={item.ticker}>
-                    <TableCell className="font-mono font-semibold">{item.ticker}</TableCell>
+                    <TableCell className="font-mono">
+                      {onTickerClick ? (
+                        <button
+                          onClick={() => {
+                            const sizing = rawCandidates.find(s => s.ticker === item.ticker);
+                            onTickerClick(item.ticker, sizing);
+                          }}
+                          className="cursor-pointer font-semibold text-zinc-900 hover:text-blue-600 hover:underline"
+                        >
+                          {item.ticker}
+                        </button>
+                      ) : (
+                        <span className="font-semibold">{item.ticker}</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Pill tone="neutral">{item.mode}</Pill>
                     </TableCell>
@@ -2756,6 +2779,7 @@ export default function TradingAgentDashboard() {
   // Ticker chart modal state
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [isChartModalOpen, setIsChartModalOpen] = useState(false);
+  const [selectedSizing, setSelectedSizing] = useState<import("@/types/sizing").SizingOutput | undefined>(undefined);
 
   // Sell modal state
   const [sellPosition, setSellPosition] = useState<PortfolioPosition | null>(null);
@@ -2769,14 +2793,16 @@ export default function TradingAgentDashboard() {
   const [isEditingEquity, setIsEditingEquity] = useState(false);
   const [equityInput, setEquityInput] = useState("100000");
 
-  const handleTickerClick = (ticker: string) => {
+  const handleTickerClick = (ticker: string, sizing?: import("@/types/sizing").SizingOutput) => {
     setSelectedTicker(ticker);
+    setSelectedSizing(sizing);
     setIsChartModalOpen(true);
   };
 
   const handleCloseChartModal = () => {
     setIsChartModalOpen(false);
     setSelectedTicker(null);
+    setSelectedSizing(undefined);
   };
 
   const handleOpenSellModal = (position: PortfolioPosition) => {
@@ -3121,6 +3147,7 @@ export default function TradingAgentDashboard() {
           ticker={selectedTicker}
           isOpen={isChartModalOpen}
           onClose={handleCloseChartModal}
+          sizingData={selectedSizing}
         />
       )}
 
