@@ -28,7 +28,7 @@ python3 "$CODE/journal_gen.py" >>"$LOG" 2>&1 || true
 
 SIGNALS="$(printf '%s\n' "$OUT" | grep -E '^([A-Z]+ \| (FULL|HALF) \||BUY |ADD )' || true)"
 if [ -n "$SIGNALS" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-  MSG="Alex:\n$SIGNALS"
+  MSG="Alex:\n$SIGNALS\n\nJournal: https://michaels-mac-mini.tail1e9dc5.ts.net:8443/"
   curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
     --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
     --data-urlencode "text=$(printf '%b' "$MSG")" >>"$LOG" 2>&1 || echo "[$(ts)] intraday telegram error" >>"$LOG"

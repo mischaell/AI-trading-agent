@@ -40,7 +40,7 @@ HEAD="$(printf '%s\n' "$OUT" | grep -E '^SCORECARD' || true)"
 if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
   # Send a message only when there is something actionable, plus a weekly scorecard (Fridays).
   MSG=""
-  [ -n "$SIGNALS" ] && MSG="Alex:\n$SIGNALS"
+  [ -n "$SIGNALS" ] && MSG="Alex:\n$SIGNALS\n\nJournal: https://michaels-mac-mini.tail1e9dc5.ts.net:8443/"
   if [ -n "$MSG" ]; then
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
       --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
