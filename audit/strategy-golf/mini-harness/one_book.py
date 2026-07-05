@@ -18,9 +18,10 @@ approved, C = my convention flagged to him.
             CONFIRMED/EARLY; single close exits all                       [T]
   no trims  exits only via trail                                          [M]
   guards    >40% overnight close jump freezes position (split suspicion)  [T]
-  sleeve    $100,000 reference. NOT ENFORCED (open decision #14): the
-            approving backtests ran unconstrained (peak ~$238k); the
-            nightly summary prints deployed $ so divergence is visible    [OPEN]
+  sleeve    $100,000: when deployed cost >= $100k, only winner-continuation
+            probes may open; all other new entries are skipped (logged).
+            Adds (catch-ups on his calls) remain allowed when full [C —
+            "entries" ruled by Michael 2026-07-06; adds unruled, flagged]  [M/C]
 
 Supersedes the 2026-07-05 v1 (price-ladder adds, 2x dial).
 State: one_book.json. Alerts: BUY / ADD / SELL. EOD cadence.
@@ -133,8 +134,14 @@ def process_candidates(st, cands):
             continue
         a0 = engine.atr(bars, 14, i0)
         if not a0 or not px: continue
-        st["last_core"][tkr] = d
         wc = winner_continuation(tkr, d)
+        deployed = sum(sum(s * lp for s, lp in p["lots"])
+                       for p in st["positions"] if p["status"] == "open")
+        if deployed >= 100_000 and not wc:
+            print(f"one_book: {key} skipped (sleeve full at ${deployed:,.0f}; "
+                  f"only winner-continuation entries allowed)")
+            continue
+        st["last_core"][tkr] = d
         size = PROBE_WC if wc else PROBE
         sh = size / px
         st["positions"].append(dict(
