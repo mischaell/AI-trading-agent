@@ -1,26 +1,30 @@
 #!/usr/bin/env python3
-"""one_book.py — THE BOOK, live paper version (replaces campaign_book, 2026-07-05).
+"""one_book.py — THE BOOK, live paper version (v2 design, 2026-07-06).
 
-Rules (frozen; backtested as A18/E0 in tradeoff_sweep.py):
-  qualify   2 Alex calls within 90 days, OR one call if the ticker was a core
-            name within the last 18 months (A18)
-  entry     $5,000 at the qualifying day's CLOSE (2x dial) (bars, not posted prices)
-  adds      +$5,000 when close is 3*ATR, then 6*ATR above basis (entry-day ATR)
-  trail     3*ATR(14) below highest close; tightens to 2*ATR beyond +6 ATR of
-            gain, 1.5*ATR beyond +12; halves while market state is below
-            CONFIRMED/EARLY; exit ALL on a single close below the trail
-  re-entry  after an exit the ticker needs a fresh qualifying call
-  no trims  no partial exits of any kind
-  guards    split/rebase freeze: >40% overnight close jump freezes the
-            position for manual review instead of auto-selling
-  sleeve    $100,000 paper, ~6-7 names max at full build ($15,000/name)
+Parameter provenance: M = Michael's explicit words, T = tested choice he
+approved, C = my convention flagged to him.
 
-State: ~/mission-control/alex-forward-test/one_book.json
-Alerts to stdout: BUY / ADD / SELL. EOD cadence (entries are at-close prices;
-live execution is next open — slippage vs paper is expected and tracked by
-comparing to the recorded close).
-Usage: one_book.py --run   (process new calls + advance daily bars)
-       one_book.py --backfill  (seed last-core dates from calls_live.json)
+  qualify   2 Alex calls in 90d, or 1 call if core within 18mo (A18)      [T]
+  probe     $2,500 at qualifying day's close                              [M]
+            $5,000 if winner-continuation: his last stated Closed in the
+            ticker within 30 days was a profit                            [T]
+  adds      triggered by HIS next call in the name while our position is
+            in profit (close > basis); catch-up sizing to targets
+            $11,000 -> $19,000 -> $28,000 (his avg first position / his
+            p75 single / his median full build)                           [M/T]
+            his call while we are losing: ignored                         [M]
+  trail     3*ATR(14) below highest close; 2*ATR beyond +6 ATR gain,
+            1.5*ATR beyond +12 [C stages]; halved while market state below
+            CONFIRMED/EARLY; single close exits all                       [T]
+  no trims  exits only via trail                                          [M]
+  guards    >40% overnight close jump freezes position (split suspicion)  [T]
+  sleeve    $100,000 reference. NOT ENFORCED (open decision #14): the
+            approving backtests ran unconstrained (peak ~$238k); the
+            nightly summary prints deployed $ so divergence is visible    [OPEN]
+
+Supersedes the 2026-07-05 v1 (price-ladder adds, 2x dial).
+State: one_book.json. Alerts: BUY / ADD / SELL. EOD cadence.
+Usage: --run | --backfill
 """
 import json, os, sys
 from datetime import datetime
@@ -29,11 +33,14 @@ STATE_DIR = os.path.expanduser("~/mission-control/alex-forward-test")
 STATE = os.path.join(STATE_DIR, "one_book.json")
 CALLS = os.path.join(STATE_DIR, "calls_live.json")
 REGIME = os.path.join(STATE_DIR, "regime_states.json")
+EXITS = [os.path.join(STATE_DIR, "exits_seed.jsonl"),
+         os.path.join(STATE_DIR, "exits_live.jsonl")]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import engine
 
-SLICE = 5000                                  # dial 2x (Michael, 2026-07-05); was 2500
-CORE_WINDOW, RETURN_WINDOW = 90, 540          # days: 2-in-90d, A18 = 18 months
+PROBE, PROBE_WC = 2500, 5000
+TARGETS = [11000, 19000, 28000]
+CORE_WINDOW, RETURN_WINDOW, WC_WINDOW = 90, 540, 30
 
 def days(a, b): return (datetime.strptime(b, "%Y-%m-%d") - datetime.strptime(a, "%Y-%m-%d")).days
 
@@ -49,30 +56,45 @@ def risk_on(d):
     p = [x for x in sorted(states) if x < d]
     return bool(p) and states[p[-1]] in ("CONFIRMED_UPTREND", "EARLY_CONFIRMATION")
 
+def winner_continuation(tkr, date):
+    """His most recent stated Closed for this ticker within 30d was a profit."""
+    best = None
+    for path in EXITS:
+        if not os.path.exists(path): continue
+        for l in open(path):
+            try: r = json.loads(l)
+            except ValueError: continue
+            if (r.get("action") == "Closed" and r.get("ticker") == tkr
+                    and r.get("pnl_pct") is not None and r["msg_date"] < date
+                    and days(r["msg_date"], date) <= WC_WINDOW):
+                if best is None or r["msg_date"] > best[0]:
+                    best = (r["msg_date"], r["pnl_pct"])
+    return bool(best) and best[1] > 0
+
 def open_pos(st, tkr):
     return next((p for p in st["positions"] if p["ticker"] == tkr and p["status"] in ("open", "frozen")), None)
 
 def qualifies(st, tkr, date):
     calls = json.load(open(CALLS)) if os.path.exists(CALLS) else []
-    prior = [c[0] for c in calls if c[1] == tkr and c[0] < date and days(c[0], date) <= CORE_WINDOW]
-    if prior: return "2-in-90d"
+    if [c for c in calls if c[1] == tkr and c[0] < date and days(c[0], date) <= CORE_WINDOW]:
+        return "2-in-90d"
     lc = st["last_core"].get(tkr)
     if lc and days(lc, date) <= RETURN_WINDOW: return "A18 returning leader"
     return None
 
 def backfill(st):
-    """Seed last_core from full call history so A18 works from day one."""
     calls = sorted(json.load(open(CALLS)), key=lambda c: c[0]) if os.path.exists(CALLS) else []
     bytkr = {}
     for c in calls: bytkr.setdefault(c[1], []).append(c[0])
     for tkr, ds in bytkr.items():
         lc = None
         for i, d in enumerate(ds):
-            two = any(0 < days(x, d) <= CORE_WINDOW for x in ds[:i])
-            ret = lc and days(lc, d) <= RETURN_WINDOW
-            if two or ret: lc = d
+            if any(0 < days(x, d) <= CORE_WINDOW for x in ds[:i]) or (lc and days(lc, d) <= RETURN_WINDOW):
+                lc = d
         if lc: st["last_core"][tkr] = lc
     print(f"one_book backfill: {len(st['last_core'])} tickers with core history")
+
+def value(p, px): return sum(s for s, _ in p["lots"]) * px
 
 def process_candidates(st, cands):
     alerts = []
@@ -81,28 +103,46 @@ def process_candidates(st, cands):
         if key in st["seen"]: continue
         st["seen"].append(key)
         tkr, d = c["ticker"], c["date"]
-        if open_pos(st, tkr):
-            print(f"one_book: {key} noted (position already open; adds are price-driven)")
+        bars = engine.load(tkr)
+        if not bars: continue
+        i0 = next((i for i, b in enumerate(bars) if b["date"] >= d), None)
+        if i0 is None or i0 < 20: continue
+        px = bars[i0]["close"]
+        pos = open_pos(st, tkr)
+        if pos and pos["status"] == "open":
+            if px <= pos["basis"]:
+                print(f"one_book: {key} ignored (his add, position not in profit: "
+                      f"{px:,.2f} <= basis {pos['basis']:,.2f})")
+                continue
+            if pos["stage"] >= len(TARGETS):
+                print(f"one_book: {key} ignored (fully built at ${TARGETS[-1]:,})")
+                continue
+            tgt = TARGETS[pos["stage"]]
+            val = value(pos, px)
+            if val < tgt:
+                add = tgt - val
+                sh = add / px
+                pos["lots"].append([sh, px])
+                alerts.append(f"ADD {tkr} | {sh:.1f} sh @ {px:,.2f} close = ${add:,.0f} "
+                              f"(his add, catch-up to ${tgt:,}) | position ~${value(pos, px):,.0f}")
+            pos["stage"] += 1
             continue
         why = qualifies(st, tkr, d)
         if not why:
             print(f"one_book: {key} not qualified (1st call in 90d, not core within 18mo)")
             continue
-        bars = engine.load(tkr)
-        if not bars: continue
-        i0 = next((i for i, b in enumerate(bars) if b["date"] >= d), None)
-        if i0 is None or i0 < 20: continue
         a0 = engine.atr(bars, 14, i0)
-        px = bars[i0]["close"]
         if not a0 or not px: continue
         st["last_core"][tkr] = d
-        sh = SLICE / px
+        wc = winner_continuation(tkr, d)
+        size = PROBE_WC if wc else PROBE
+        sh = size / px
         st["positions"].append(dict(
             ticker=tkr, status="open", opened=bars[i0]["date"], basis=px, atr0=a0,
-            lots=[[sh, px]], peak=px, adds=0, last_date=bars[i0]["date"]))
-        trail = px - 3 * a0
-        alerts.append(f"BUY {tkr} | {sh:.1f} sh @ {px:,.2f} close = ${SLICE:,} | {why} "
-                      f"| trail 3xATR (now {trail:,.2f}) | adds at {px + 3*a0:,.2f} / {px + 6*a0:,.2f}")
+            lots=[[sh, px]], peak=px, stage=0, last_date=bars[i0]["date"]))
+        tag = " | winner-continuation, $5k probe" if wc else ""
+        alerts.append(f"BUY {tkr} | {sh:.1f} sh @ {px:,.2f} close = ${size:,} | {why}{tag} "
+                      f"| trail 3xATR (now {px - 3*a0:,.2f})")
     return alerts
 
 def advance(st):
@@ -124,12 +164,6 @@ def advance(st):
             a = engine.atr(bars, 14, j) or p["atr0"]
             p["peak"] = max(p["peak"], c)
             gain = (c - p["basis"]) / p["atr0"]
-            while p["adds"] < 2 and gain >= 3 * (p["adds"] + 1):
-                sh = SLICE / c
-                p["lots"].append([sh, c]); p["adds"] += 1
-                tot = sum(s for s, _ in p["lots"]) * c
-                alerts.append(f"ADD {tkr} | {sh:.1f} sh @ {c:,.2f} close = ${SLICE:,} "
-                              f"(+{3*p['adds']} ATR above basis) | position ~${tot:,.0f}")
             w = 3.0
             if gain > 12: w = 1.5
             elif gain > 6: w = 2.0
@@ -137,7 +171,7 @@ def advance(st):
             trail = p["peak"] - w * a
             if c < trail:
                 cost = sum(s * px for s, px in p["lots"])
-                pnl = sum(s for s, _ in p["lots"]) * c - cost
+                pnl = value(p, c) - cost
                 p["status"] = "closed"; p["closed"] = b["date"]; p["pnl"] = round(pnl, 2)
                 st["realized"] += pnl; st["closed"] += 1; st["wins"] += 1 if pnl > 0 else 0
                 alerts.append(f"SELL {tkr} | all {sum(s for s,_ in p['lots']):.1f} sh @ {c:,.2f} "
@@ -156,8 +190,9 @@ def main():
             alerts += process_candidates(st, json.load(open(path)))
     alerts += advance(st)
     openp = [p for p in st["positions"] if p["status"] == "open"]
-    print(f"one_book: {len(openp)} open, {st['closed']} closed ({st['wins']} wins), "
-          f"realized ${st['realized']:+,.0f}")
+    deployed = sum(sum(s * px for s, px in p["lots"]) for p in openp)
+    print(f"one_book: {len(openp)} open (${deployed:,.0f} deployed at cost), "
+          f"{st['closed']} closed ({st['wins']} wins), realized ${st['realized']:+,.0f}")
     save(st)
     for a in alerts: print(a)
 

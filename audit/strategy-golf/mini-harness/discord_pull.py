@@ -14,6 +14,37 @@ TOKEN_PATH = os.path.expanduser("~/.openclaw/auth/.discord_user_token")
 STATE_DIR = os.path.expanduser("~/mission-control/alex-forward-test")
 SEEN = os.path.join(STATE_DIR, "seen_ids.json")
 OUT = os.path.join(STATE_DIR, "candidates.json")
+NUM = r'-?\d+(?:\.\d+)?'
+EXIT_PAT = re.compile(
+    r'\b(Trimmed|Closed)\s+(?:(\d+/\d+)\s+)?([A-Z]{1,6})\b'
+    r'(?:\s*\((\d{1,2}/\d{1,2})\))?'
+    rf'(?:\s*@\s*({NUM})\s*(%|R)?)?'
+    rf'(?:\s*\(({NUM})\))?', re.I)
+EXITS_LIVE = os.path.join(STATE_DIR, "exits_live.jsonl")
+
+def tranche_year(md, msg_date):
+    m = int(md.split("/")[0]); y = int(msg_date[:4])
+    return f"{y-1 if m > int(msg_date[5:7]) else y}-{m:02d}-{int(md.split('/')[1]):02d}"
+
+def capture_exits(msgs):
+    seen = set()
+    if os.path.exists(EXITS_LIVE):
+        seen = {l.strip() for l in open(EXITS_LIVE)}
+    added = 0
+    with open(EXITS_LIVE, "a") as f:
+        for m in msgs:
+            for h in EXIT_PAT.finditer(m.get("content", "") or ""):
+                action, frac, tkr, md, val, unit, paren = h.groups()
+                rec = dict(msg_date=m["timestamp"][:10], action=action.title(),
+                           ticker=tkr.upper(),
+                           tranche_date=tranche_year(md, m["timestamp"][:10]) if md else None,
+                           pnl_pct=float(val) if val and unit == "%" else None,
+                           price=float(paren) if paren else None)
+                line = json.dumps(rec)
+                if line not in seen:
+                    f.write(line + "\n"); seen.add(line); added += 1
+    return added
+
 PAT = re.compile(r'\b(Long|ADD\w*)\s+([\d.]+)%\s+([A-Z]{1,6})\s+@\s+([\d.]+).*?S?SL\s*@\s*([\d.]+)', re.I | re.S)  # v2: Long + ADD entry formats
 
 def fetch():
@@ -29,6 +60,8 @@ def main():
         msgs = fetch()
     except Exception as e:
         print(f"discord_pull: fetch failed ({e}); writing empty candidates"); json.dump([], open(OUT, "w")); return
+    nex = capture_exits(msgs)
+    if nex: print(f"discord_pull: {nex} new exit records -> exits_live.jsonl")
     cands = []
     for m in msgs:
         if m.get("author", {}).get("id") != ALEX or m["id"] in seen:
