@@ -198,6 +198,17 @@ no charset header from http.server = mojibake (fixed, verified by headless
 screenshot); the remote MCP fetcher refuses tailnet URLs by design — visual
 checks run via the local headless-fetch skill on the Mini itself.
 
+**Prime-report pillars (2026-07-06):** the journal's primary market picture is
+now Alex's own nightly 5-pillar checklist from the prime-report channel —
+`prime_pull.py` parses his verbatim verdicts (QQQE / Breadth / Internals /
+Liquid Leaders / Portfolio, each risk-on green, risk-off red, anything else
+amber). Ground-truth-first discipline applied to the UI itself: his stated
+reads on top, our computed state/internals demoted to a labeled "Our sensors"
+line. Immediate payoff: the two disagreed on day one (his internals risk-on
+7/1 vs our X-flag risk-off) — the live adjudication the logged-only X flag
+was built for, now visible on one card. Book state was also reset by Michael
+to mirror his single real holding (SNOW, 21 sh @ 238.54, $5k cost).
+
 ## 6 · The pre-registered live experiment (2026H2 grades it)
 
 Frozen as of 2026-07-05 — no further tuning against 2026H1 data:
