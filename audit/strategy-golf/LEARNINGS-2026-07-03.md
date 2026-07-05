@@ -175,6 +175,16 @@ probes (2025-only benefit), fixed-ATR catch-up rungs (+9 ATR "ridiculous").
 Still open (flagged defaults): regime gate on adds, re-arm, exits at size,
 entry convention (paper=close, live fill=next open).
 
+**Exit ruling (final, 2026-07-06):** high-R de-risk trims tested against the
+trail-tightening (¼ off at +10 ATR; ⅓ off on 3×ATR extension; built positions
+only) — an exact substitute, not an improvement: two-year totals equal
+(~$56.6k), trims better in grind years (2026 +$1.6k, max giveback $8.6k→$5.6k),
+tightening better in break years (2025 +$1.6–3.3k), combining both slightly
+worse (double de-risk, second sale only costs upside). Michael ruled: **keep
+trail-tightening, no trims.** The general lesson: past a point, exit variants
+stop adding money and only choose which year-type pays — the honest frame is
+insurance selection, not optimization.
+
 ## 6 · The pre-registered live experiment (2026H2 grades it)
 
 Frozen as of 2026-07-05 — no further tuning against 2026H1 data:
