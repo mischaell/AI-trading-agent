@@ -1,0 +1,127 @@
+{
+  "created": "2026-07-05 14:26",
+  "inputs": {
+    "sg/calls_v2.json": "204fae5922fd5ce6",
+    "exits.jsonl": "80588eb452cbc007",
+    "pf-update-raw.jsonl": "135206a90ed3f4f6"
+  },
+  "A_entry_range": {
+    "total": 619,
+    "in_range": 595,
+    "out_of_range": 21,
+    "no_bars": 1,
+    "excluded_tickers": [
+      "ANET",
+      "CRWD",
+      "CVNA",
+      "KLAC",
+      "NFLX",
+      "SOLT",
+      "SPXS",
+      "SQQQ",
+      "TQQQ"
+    ]
+  },
+  "B_arithmetic": {
+    "checked": 374,
+    "within_3pts": 306,
+    "agree_rate": 0.818,
+    "note": "disagreements are mostly trim-basis accounting, see worst",
+    "worst": [
+      [
+        "ARM",
+        "2026-04-09",
+        80.1,
+        133.7
+      ],
+      [
+        "MU",
+        "2026-04-13",
+        62.1,
+        112.6
+      ],
+      [
+        "MU",
+        "2025-09-04",
+        52.8,
+        98.8
+      ],
+      [
+        "NBIS",
+        "2026-04-06",
+        59.9,
+        105.2
+      ],
+      [
+        "SNDK",
+        "2025-12-29",
+        92.4,
+        134.0
+      ]
+    ]
+  },
+  "C_edited_messages": {
+    "messages_scanned": 2966,
+    "edited": 233,
+    "examples": [
+      [
+        "2026-06-08",
+        "2026-06-08",
+        "**PORTFOLIO UPDATE 6/7**  Hey guys, weekend recap and yeah, "
+      ],
+      [
+        "2026-05-29",
+        "2026-05-29",
+        "# Alex's PF performance. - May 2026 \ud83d\udcca\ud83d\udee1\ufe0f **- MTD ( +23.3% ) -"
+      ],
+      [
+        "2026-05-21",
+        "2026-05-21",
+        "# PORTFOLIO UPDATE 5/21  Hey guys! Quick one tonight. Crazy "
+      ],
+      [
+        "2026-05-15",
+        "2026-05-18",
+        "# PORTFOLIO UPDATE 5/17  Hey! Hope you had a great weekend a"
+      ],
+      [
+        "2026-05-07",
+        "2026-05-07",
+        "# PORTFOLIO UPDATE 5/7  Hey guys!   We did we discussed last"
+      ],
+      [
+        "2026-05-01",
+        "2026-05-01",
+        "**Alex\u2019s PF performance. - April 2026  \ud83d\udcd1\ud83d\udee1\ufe0f** @everyone  MTD "
+      ],
+      [
+        "2026-02-24",
+        "2026-02-24",
+        "@everyone Long 7% NBIS @ 102.21 (SSL @ 94.81) (EC risk : -0."
+      ],
+      [
+        "2026-02-11",
+        "2026-02-11",
+        "@everyone Long 26% META @ 673.45 (SSL @ 659.91) (EC risk : -"
+      ]
+    ]
+  },
+  "D_completeness": {
+    "pf_book_tickers": 104,
+    "also_in_call_feed": 99,
+    "in_book_never_called": 5,
+    "examples_never_called": [
+      "AAPL",
+      "ALL",
+      "GOOGL",
+      "NEM",
+      "PINS"
+    ]
+  },
+  "E_stated_series": {
+    "points": 17,
+    "implausible_steps": []
+  },
+  "verdict": "WARN",
+  "fail_reasons": []
+}

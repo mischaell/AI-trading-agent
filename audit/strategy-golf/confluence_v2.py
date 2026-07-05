@@ -54,6 +54,7 @@ def main():
     strat = dict(S.STRATEGY); strat["filter"] = "all"
     legs = []
     for date, tkr, e, sl, fmt, size in calls:
+        if tkr in _EXCLUDED: continue   # split-corrupted posted prices (dataset stamp)
         bars = engine.load(tkr)
         if not bars: continue
         i0 = next((i for i, b in enumerate(bars) if b["date"] >= date), None)

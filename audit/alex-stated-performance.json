@@ -1,0 +1,108 @@
+{
+  "definition": "GROUND TRUTH: Alex's stated numbers, verbatim from pf-update monthly posts",
+  "pulled": "2026-07-05",
+  "series": [
+    {
+      "posted": "2024-10-01",
+      "monthly": 6.08,
+      "ytd": 47.57,
+      "source_msg_id": "1290496178424909884"
+    },
+    {
+      "posted": "2024-11-29",
+      "monthly": 20.56,
+      "ytd": 73.43,
+      "source_msg_id": "1312122866917183579"
+    },
+    {
+      "posted": "2025-01-05",
+      "monthly": -3.77,
+      "ytd": 66.47,
+      "source_msg_id": "1325465370425032796"
+    },
+    {
+      "posted": "2025-02-03",
+      "monthly": null,
+      "ytd": 3.42,
+      "source_msg_id": "1336075020874547230"
+    },
+    {
+      "posted": "2025-03-31",
+      "monthly": null,
+      "ytd": -3.13,
+      "source_msg_id": "1356336850955931849"
+    },
+    {
+      "posted": "2025-04-30",
+      "monthly": null,
+      "ytd": 13.36,
+      "source_msg_id": "1367230908792438895"
+    },
+    {
+      "posted": "2025-05-30",
+      "monthly": null,
+      "ytd": 39.18,
+      "source_msg_id": "1378105595118223422"
+    },
+    {
+      "posted": "2025-06-30",
+      "monthly": null,
+      "ytd": 50.94,
+      "source_msg_id": "1389337570697023619"
+    },
+    {
+      "posted": "2025-08-01",
+      "monthly": null,
+      "ytd": 62.1,
+      "source_msg_id": "1400663368435503104"
+    },
+    {
+      "posted": "2025-09-02",
+      "monthly": null,
+      "ytd": 53.75,
+      "source_msg_id": "1412258742824865926"
+    },
+    {
+      "posted": "2025-09-30",
+      "monthly": null,
+      "ytd": 82.67,
+      "source_msg_id": "1422681704207745024"
+    },
+    {
+      "posted": "2025-10-31",
+      "monthly": null,
+      "ytd": 110.98,
+      "source_msg_id": "1433910795770793984"
+    },
+    {
+      "posted": "2025-12-01",
+      "monthly": null,
+      "ytd": 97.18,
+      "source_msg_id": "1445070055648919795"
+    },
+    {
+      "posted": "2026-01-05",
+      "monthly": null,
+      "ytd": 90.2,
+      "source_msg_id": "1457810882275835996"
+    },
+    {
+      "posted": "2026-04-07",
+      "monthly": null,
+      "ytd": -15.11,
+      "source_msg_id": "1491135928104914964"
+    },
+    {
+      "posted": "2026-05-01",
+      "monthly": null,
+      "ytd": 2.91,
+      "source_msg_id": "1499846693263249408"
+    },
+    {
+      "posted": "2026-05-29",
+      "monthly": null,
+      "ytd": 26.8,
+      "source_msg_id": "1510017854693572739"
+    }
+  ]
+}

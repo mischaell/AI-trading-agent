@@ -93,6 +93,7 @@ def main():
     calls = json.load(open(os.path.join(HERE, "calls_v2.json")))
     bytkr = {}
     for d, tkr, e, sl, fmt, size in calls:
+        if tkr in _EXCLUDED: continue   # split-corrupted posted prices (dataset stamp)
         bars = engine.load(tkr)
         if not bars: continue
         i0 = next((i for i, b in enumerate(bars) if b["date"] >= d), None)
