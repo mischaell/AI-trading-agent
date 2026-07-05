@@ -20,8 +20,8 @@ approved, C = my convention flagged to him.
   guards    >40% overnight close jump freezes position (split suspicion)  [T]
   sleeve    $100,000: when deployed cost >= $100k, only winner-continuation
             probes may open; all other new entries are skipped (logged).
-            Adds (catch-ups on his calls) remain allowed when full [C —
-            "entries" ruled by Michael 2026-07-06; adds unruled, flagged]  [M/C]
+            Adds (catch-ups on his calls) remain allowed when full
+            (Michael confirmed 2026-07-06)                                [M]
 
 Supersedes the 2026-07-05 v1 (price-ladder adds, 2x dial).
 State: one_book.json. Alerts: BUY / ADD / SELL. EOD cadence.
