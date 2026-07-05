@@ -22,6 +22,7 @@ ts() { date "+%Y-%m-%d %H:%M:%S"; }
 
 python3 "$CODE/discord_pull.py" >>"$LOG" 2>&1 || { echo "[$(ts)] intraday pull error" >>"$LOG"; exit 0; }
 OUT="$(python3 "$CODE/intraday_check.py" 2>>"$LOG" || true)"
+python3 "$CODE/prime_pull.py" >>"$LOG" 2>&1 || true
 python3 "$CODE/journal_gen.py" >>"$LOG" 2>&1 || true
 
 [ -n "$OUT" ] && { echo "[$(ts)] --- intraday ---" >>"$LOG"; printf '%s\n' "$OUT" >>"$LOG"; }

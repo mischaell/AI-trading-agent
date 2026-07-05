@@ -32,6 +32,20 @@ def trail_now(p, last_close, atr):
 
 def money(x): return f"${x:,.0f}"
 
+def alex_pillars():
+    """HIS 5-pillar reads from prime-report (ground truth, verbatim verdicts)."""
+    p = os.path.join(STATE_DIR, "prime_pillars.json")
+    if not os.path.exists(p): return ""
+    d = json.load(open(p))
+    rows = []
+    for pil in d["pillars"]:
+        v = pil["verdict"]
+        cls = "up" if "risk-on" in v.lower() else ("down" if "risk-off" in v.lower() else "mix")
+        short = {1: "QQQE", 2: "Breadth", 3: "Internals", 4: "Liquid Leaders", 5: "Portfolio"}.get(pil["n"], pil["name"])
+        rows.append(f"<span>{short} <b class='{cls}'>{v}</b></span>")
+    return (f'<h2>Market picture — Alex, prime-report {d.get("report") or d["msg_date"]}</h2>'
+            '<div class="card"><div class="sub pillars">' + " · ".join(rows) + "</div></div>")
+
 def market_picture():
     """Alex's pf-update 'Market picture', from our computed data."""
     parts = []
@@ -112,14 +126,15 @@ h1 {{ font-size:19px; margin:4px 0 2px; }} h2 {{ font-size:14px; color:var(--mut
 .sub {{ color:var(--mut); font-size:13px; }}
 .badge {{ font-size:11px; background:var(--bd); border-radius:99px; padding:1px 8px; color:var(--mut); }}
 .badge.frz {{ background:var(--dn); color:#fff; }}
-.up {{ color:var(--up); }} .down {{ color:var(--dn); }}
+.up {{ color:var(--up); }} .down {{ color:var(--dn); }} .mix {{ color:#c8860a; }}
 table {{ width:100%; border-collapse:collapse; font-size:14px; }} td {{ padding:6px 4px; border-bottom:1px solid var(--bd); }}
 ul {{ padding-left:0; list-style:none; margin:0; }} li {{ padding:5px 0; border-bottom:1px solid var(--bd); }}
 footer {{ color:var(--mut); font-size:12px; margin:22px 0 8px; }}
 </style>
 </head><body>
 <h1>THE BOOK — paper journal</h1>
-{market_picture()}
+{alex_pillars()}
+{market_picture().replace('<h2>Market picture</h2>', '<h2>Our sensors (computed)</h2>')}
 <div class="summary">
  <div class="stat"><div class="k">open positions</div><div class="v">{len(openp)}</div></div>
  <div class="stat"><div class="k">deployed (cost)</div><div class="v">{money(tot_cost)}</div></div>
