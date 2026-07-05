@@ -21,12 +21,20 @@ python3 "$CODE/discord_pull.py" >>"$LOG" 2>&1 || echo "[$(ts)] pull error" >>"$L
 # 1b) refresh bars + 5-state regime (prevents the stale-cache silent-drop failure)
 python3 "$CODE/refresh_data.py" >>"$LOG" 2>&1 || echo "[$(ts)] refresh error" >>"$LOG"
 
+# 1c) THE BOOK (one_book): qualification + entries at close + daily advance
+BOOK="$(python3 "$CODE/one_book.py" --run 2>>"$LOG" || true)"
+BOOK2=""
+printf '%s\n' "$BOOK" >>"$LOG"
+
 # 2) core: advance open positions + ingest new candidates -> alert text
 OUT="$(python3 "$CODE/forward_test.py" --candidates "$STATE_DIR/candidates.json" 2>>"$LOG")"
+OUT="$OUT
+$BOOK
+$BOOK2"
 echo "$OUT" >>"$LOG"
 
 # 3) Telegram. Always send the scorecard head; signals/trims/exits if present.
-SIGNALS="$(printf '%s\n' "$OUT" | grep -E '^([A-Z]+ \| (FULL|HALF|DEMOTED)|TRIM|EXIT)' || true)"
+SIGNALS="$(printf '%s\n' "$OUT" | grep -E '^([A-Z]+ \| (FULL|HALF|DEMOTED)|BUY |ADD |TRIM |SELL |EXIT)' || true)"
 HEAD="$(printf '%s\n' "$OUT" | grep -E '^SCORECARD' || true)"
 if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
   # Send a message only when there is something actionable, plus a weekly scorecard (Fridays).

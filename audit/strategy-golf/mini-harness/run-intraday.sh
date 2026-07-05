@@ -22,9 +22,10 @@ ts() { date "+%Y-%m-%d %H:%M:%S"; }
 
 python3 "$CODE/discord_pull.py" >>"$LOG" 2>&1 || { echo "[$(ts)] intraday pull error" >>"$LOG"; exit 0; }
 OUT="$(python3 "$CODE/intraday_check.py" 2>>"$LOG" || true)"
+
 [ -n "$OUT" ] && { echo "[$(ts)] --- intraday ---" >>"$LOG"; printf '%s\n' "$OUT" >>"$LOG"; }
 
-SIGNALS="$(printf '%s\n' "$OUT" | grep -E '^[A-Z]+ \| (FULL|HALF) \|' || true)"
+SIGNALS="$(printf '%s\n' "$OUT" | grep -E '^([A-Z]+ \| (FULL|HALF) \||BUY |ADD )' || true)"
 if [ -n "$SIGNALS" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
   MSG="Alex:\n$SIGNALS"
   curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
