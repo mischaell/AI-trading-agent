@@ -1,0 +1,10 @@
+{
+ "engine.py": "ada2206e99ade0727659f78e92af5b90647a5ec56b23f3ffbee0c0e8b546f87d",
+ "lfd/goal.md": "81c6c44a93f19a7926cab4e195458985ba5ec6b139aba7eb0f8b4bf3008f79e7",
+ "lfd/harness/score_lfd.py": "0cc5a1be83714bf54a6854511739e91aacbabf6a990179d700245a78a3916d4a",
+ "lfd/harness/lint.py": "733216e34da7588d9500dcaa5bf0c0b91ac14cd77e654c6c13117394d2846e10",
+ "lfd/harness/probe.py": "13d87859b890135bda8d6e0ae25eaafa73ac29fcd21574879bef97f32812d820",
+ "lfd/harness/score.sh": "e9bb92da3474496e89d5567814fc6e5bfb9604579d7665d97a577bfe5d5d81e8",
+ "lfd/harness/status.sh": "588adc72b543248f65bab8613972ac88a441e01358b4f4d8618d8ffa1dac29b0",
+ "lfd/harness/holdout.sh": "c840c42b56cd9365b2b497c8a7548c01ffe5b411ab2d59f78c58a706a11b3924"
+}

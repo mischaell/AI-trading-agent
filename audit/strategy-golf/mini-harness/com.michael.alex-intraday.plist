@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.michael.alex-intraday</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>$HOME/mission-control/alex-forward-test/code/run-intraday.sh</string>
+  </array>
+  <!-- fires every 15 min; the script self-gates to weekdays 14:25-21:10 UK -->
+  <key>StartInterval</key>
+  <integer>900</integer>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>/tmp/alex-intraday.out</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alex-intraday.err</string>
+</dict>
+</plist>

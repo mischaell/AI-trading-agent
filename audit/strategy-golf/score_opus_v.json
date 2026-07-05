@@ -1,0 +1,231 @@
+{
+  "strategy": {
+    "filter": "all",
+    "exit_model": "runner",
+    "target_R": 3,
+    "regime_gate": true,
+    "rs_floor": 0.0,
+    "rs_ceiling": 0.2,
+    "fx_roundtrip_pct": 1.5
+  },
+  "goal": {
+    "beat_R_net_OOS": 0.176,
+    "min_win": 0.38,
+    "baseline_R": 0.147,
+    "uplift_required": 0.2
+  },
+  "full_sample": {
+    "gross": {
+      "n": 159,
+      "expectancy": 1.1148,
+      "win": 0.3082,
+      "total": 177.25
+    },
+    "net": {
+      "n": 159,
+      "expectancy": 0.5712,
+      "win": 0.2956,
+      "total": 90.83
+    }
+  },
+  "train": {
+    "n": 111,
+    "expectancy": 0.3346,
+    "win": 0.2613,
+    "total": 37.14
+  },
+  "test_OOS": {
+    "n": 48,
+    "expectancy": 1.1185,
+    "win": 0.375,
+    "total": 53.69
+  },
+  "by_quarter": {
+    "2024Q4": {
+      "n": 26,
+      "expectancy": -2.146
+    },
+    "2025Q1": {
+      "n": 26,
+      "expectancy": -1.5713
+    },
+    "2025Q2": {
+      "n": 19,
+      "expectancy": 5.7989
+    },
+    "2025Q3": {
+      "n": 8,
+      "expectancy": 4.6334
+    },
+    "2025Q4": {
+      "n": 28,
+      "expectancy": -0.2412
+    },
+    "2026Q1": {
+      "n": 15,
+      "expectancy": -0.4722
+    },
+    "2026Q2": {
+      "n": 37,
+      "expectancy": 1.4612
+    }
+  },
+  "regimes_positive": "3/7",
+  "top3_concentration": 1.19,
+  "open_trades": 9,
+  "self_reported": {
+    "net_full": 0.5712,
+    "net_OOS": 1.1185,
+    "net_train": 0.3346,
+    "beats_goal_OOS": true,
+    "positive_train_test_full": true
+  },
+  "n_total": 159,
+  "ledger_top": [
+    {
+      "date": "2025-05-05",
+      "tkr": "HOOD",
+      "R": 68.518,
+      "R_net": 67.686,
+      "mfe": 86.33,
+      "stop_pct": 0.018,
+      "rs": 0.1853,
+      "open": false,
+      "q": "2025Q2"
+    },
+    {
+      "date": "2026-04-29",
+      "tkr": "ORCL",
+      "R": 22.677,
+      "R_net": 21.163,
+      "mfe": 54.5,
+      "stop_pct": 0.0099,
+      "rs": 0.0179,
+      "open": false,
+      "q": "2026Q2"
+    },
+    {
+      "date": "2025-09-25",
+      "tkr": "SNOW",
+      "R": 21.344,
+      "R_net": 19.249,
+      "mfe": 39.1,
+      "stop_pct": 0.0072,
+      "rs": 0.1042,
+      "open": false,
+      "q": "2025Q3"
+    },
+    {
+      "date": "2025-04-30",
+      "tkr": "SPOT",
+      "R": 19.307,
+      "R_net": 17.932,
+      "mfe": 31.8,
+      "stop_pct": 0.0109,
+      "rs": 0.0348,
+      "open": false,
+      "q": "2025Q2"
+    },
+    {
+      "date": "2026-04-13",
+      "tkr": "MU",
+      "R": 17.243,
+      "R_net": 17.039,
+      "mfe": 22.3,
+      "stop_pct": 0.0735,
+      "rs": 0.0145,
+      "open": true,
+      "q": "2026Q2"
+    },
+    {
+      "date": "2025-04-30",
+      "tkr": "AVGO",
+      "R": 15.546,
+      "R_net": 15.126,
+      "mfe": 19.47,
+      "stop_pct": 0.0357,
+      "rs": 0.1277,
+      "open": false,
+      "q": "2025Q2"
+    },
+    {
+      "date": "2025-12-29",
+      "tkr": "SNDK",
+      "R": 11.79,
+      "R_net": 11.653,
+      "mfe": 17.68,
+      "stop_pct": 0.1101,
+      "rs": 0.1471,
+      "open": false,
+      "q": "2025Q4"
+    },
+    {
+      "date": "2026-05-18",
+      "tkr": "ARM",
+      "R": 10.994,
+      "R_net": 10.703,
+      "mfe": 20.64,
+      "stop_pct": 0.0516,
+      "rs": 0.1619,
+      "open": true,
+      "q": "2026Q2"
+    }
+  ],
+  "ledger_worst": [
+    {
+      "date": "2024-12-05",
+      "tkr": "AA",
+      "R": -7.711,
+      "R_net": -9.503,
+      "mfe": 2.03,
+      "stop_pct": 0.0084,
+      "rs": 0.0091,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-25",
+      "tkr": "CHTR",
+      "R": -5.043,
+      "R_net": -6.416,
+      "mfe": 4.8,
+      "stop_pct": 0.0109,
+      "rs": 0.1344,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2026-06-01",
+      "tkr": "INTC",
+      "R": -4.65,
+      "R_net": -5.533,
+      "mfe": 5.8,
+      "stop_pct": 0.017,
+      "rs": 0.1081,
+      "open": false,
+      "q": "2026Q2"
+    },
+    {
+      "date": "2024-11-27",
+      "tkr": "CAVA",
+      "R": -4.329,
+      "R_net": -5.302,
+      "mfe": 5.16,
+      "stop_pct": 0.0154,
+      "rs": 0.0217,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-26",
+      "tkr": "CHTR",
+      "R": -3.748,
+      "R_net": -4.716,
+      "mfe": 3.17,
+      "stop_pct": 0.0155,
+      "rs": 0.1436,
+      "open": false,
+      "q": "2024Q4"
+    }
+  ]
+}

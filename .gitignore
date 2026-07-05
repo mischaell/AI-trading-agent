@@ -37,3 +37,10 @@ next-env.d.ts
 # Large data files
 data/discord-exports/*.json
 docs/*.pdf
+
+# strategy-golf: regenerable Yahoo bar caches
+audit/.cache/
+audit/.cache2/
+audit/.cachebt/
+audit/strategy-golf/.cachebreadth/
+__pycache__/

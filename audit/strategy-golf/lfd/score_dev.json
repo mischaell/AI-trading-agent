@@ -1,0 +1,123 @@
+{
+  "n": 164,
+  "gross": 0.2944,
+  "net": 0.2543,
+  "win": 0.4695,
+  "total": 41.71,
+  "by_quarter": {
+    "2024Q4": {
+      "n": 33,
+      "expectancy": 0.1183
+    },
+    "2025Q1": {
+      "n": 30,
+      "expectancy": -0.6308
+    },
+    "2025Q2": {
+      "n": 27,
+      "expectancy": 0.8674
+    },
+    "2025Q3": {
+      "n": 21,
+      "expectancy": 0.8438
+    },
+    "2025Q4": {
+      "n": 53,
+      "expectancy": 0.2942
+    }
+  },
+  "q_pos": "4/5",
+  "top3_concentration": 0.179,
+  "open_trades": 0,
+  "strategy": {
+    "filter": "clean",
+    "exit_model": "scale",
+    "t1": 1.0,
+    "f1": 0.5,
+    "t2": 4,
+    "dband": 1.0
+  },
+  "pass_bar_dev_mirror": {
+    "D1_net_ge_bar": true,
+    "D2_win_ge_38": true,
+    "D3_net_positive": true,
+    "D4_top3_le_60": true,
+    "D5_n_ge_150": true
+  },
+  "ledger_top": [
+    {
+      "date": "2025-12-29",
+      "tkr": "SNDK",
+      "R": 2.5,
+      "R_net": 2.491,
+      "mfe": 4.02,
+      "open": false,
+      "q": "2025Q4"
+    },
+    {
+      "date": "2025-09-16",
+      "tkr": "HOOD",
+      "R": 2.5,
+      "R_net": 2.485,
+      "mfe": 4.18,
+      "open": false,
+      "q": "2025Q3"
+    },
+    {
+      "date": "2025-09-19",
+      "tkr": "VRT",
+      "R": 2.5,
+      "R_net": 2.485,
+      "mfe": 4.67,
+      "open": false,
+      "q": "2025Q3"
+    },
+    {
+      "date": "2025-09-09",
+      "tkr": "PLTR",
+      "R": 2.5,
+      "R_net": 2.484,
+      "mfe": 4.48,
+      "open": false,
+      "q": "2025Q3"
+    },
+    {
+      "date": "2025-09-17",
+      "tkr": "VRT",
+      "R": 2.5,
+      "R_net": 2.483,
+      "mfe": 4.06,
+      "open": false,
+      "q": "2025Q3"
+    }
+  ],
+  "ledger_worst": [
+    {
+      "date": "2025-10-03",
+      "tkr": "ALAB",
+      "R": -1.0,
+      "R_net": -1.158,
+      "mfe": 9.62,
+      "open": false,
+      "q": "2025Q4"
+    },
+    {
+      "date": "2025-09-25",
+      "tkr": "SNOW",
+      "R": -1.0,
+      "R_net": -1.14,
+      "mfe": 3.9,
+      "open": false,
+      "q": "2025Q3"
+    },
+    {
+      "date": "2025-02-12",
+      "tkr": "AMZN",
+      "R": -1.0,
+      "R_net": -1.132,
+      "mfe": 0.79,
+      "open": false,
+      "q": "2025Q1"
+    }
+  ]
+}

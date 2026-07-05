@@ -1,0 +1,231 @@
+{
+  "strategy": {
+    "filter": "all",
+    "exit_model": "fixed",
+    "target_R": 1.5,
+    "regime_gate": true,
+    "rs_floor": null,
+    "rs_ceiling": null,
+    "fx_roundtrip_pct": 0.0
+  },
+  "goal": {
+    "beat_R_net_OOS": 0.176,
+    "min_win": 0.38,
+    "baseline_R": 0.147,
+    "uplift_required": 0.2
+  },
+  "full_sample": {
+    "gross": {
+      "n": 305,
+      "expectancy": -0.012,
+      "win": 0.3967,
+      "total": -3.67
+    },
+    "net": {
+      "n": 305,
+      "expectancy": -0.012,
+      "win": 0.3967,
+      "total": -3.67
+    }
+  },
+  "train": {
+    "n": 213,
+    "expectancy": 0.0563,
+    "win": 0.4225,
+    "total": 12.0
+  },
+  "test_OOS": {
+    "n": 92,
+    "expectancy": -0.1704,
+    "win": 0.337,
+    "total": -15.68
+  },
+  "by_quarter": {
+    "2024Q4": {
+      "n": 60,
+      "expectancy": 0.0417
+    },
+    "2025Q1": {
+      "n": 40,
+      "expectancy": -0.625
+    },
+    "2025Q2": {
+      "n": 30,
+      "expectancy": 0.5833
+    },
+    "2025Q3": {
+      "n": 21,
+      "expectancy": 0.5476
+    },
+    "2025Q4": {
+      "n": 53,
+      "expectancy": 0.0849
+    },
+    "2026Q1": {
+      "n": 27,
+      "expectancy": -0.3519
+    },
+    "2026Q2": {
+      "n": 74,
+      "expectancy": -0.0699
+    }
+  },
+  "regimes_positive": "4/7",
+  "top3_concentration": null,
+  "open_trades": 1,
+  "self_reported": {
+    "net_full": -0.012,
+    "net_OOS": -0.1704,
+    "net_train": 0.0563,
+    "beats_goal_OOS": false,
+    "positive_train_test_full": false
+  },
+  "n_total": 305,
+  "ledger_top": [
+    {
+      "date": "2024-11-11",
+      "tkr": "CCJ",
+      "R": 1.5,
+      "R_net": 1.5,
+      "mfe": 2.55,
+      "stop_pct": 0.0247,
+      "rs": -0.0189,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-12",
+      "tkr": "CCJ",
+      "R": 1.5,
+      "R_net": 1.5,
+      "mfe": 2.58,
+      "stop_pct": 0.0202,
+      "rs": -0.029,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-13",
+      "tkr": "DDOG",
+      "R": 1.5,
+      "R_net": 1.5,
+      "mfe": 1.82,
+      "stop_pct": 0.0286,
+      "rs": -0.0723,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-13",
+      "tkr": "NRG",
+      "R": 1.5,
+      "R_net": 1.5,
+      "mfe": 1.94,
+      "stop_pct": 0.04,
+      "rs": -0.0055,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-14",
+      "tkr": "NRG",
+      "R": 1.5,
+      "R_net": 1.5,
+      "mfe": 2.04,
+      "stop_pct": 0.0387,
+      "rs": -0.0304,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-21",
+      "tkr": "FOUR",
+      "R": 1.5,
+      "R_net": 1.5,
+      "mfe": 1.91,
+      "stop_pct": 0.0423,
+      "rs": 0.0624,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-21",
+      "tkr": "NCLH",
+      "R": 1.5,
+      "R_net": 1.5,
+      "mfe": 1.84,
+      "stop_pct": 0.0187,
+      "rs": 0.0825,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-25",
+      "tkr": "GGAL",
+      "R": 1.5,
+      "R_net": 1.5,
+      "mfe": 2.49,
+      "stop_pct": 0.0314,
+      "rs": 0.0084,
+      "open": false,
+      "q": "2024Q4"
+    }
+  ],
+  "ledger_worst": [
+    {
+      "date": "2024-11-06",
+      "tkr": "VIST",
+      "R": -1.0,
+      "R_net": -1.0,
+      "mfe": 0.74,
+      "stop_pct": 0.0308,
+      "rs": 0.0483,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-06",
+      "tkr": "TSM",
+      "R": -1.0,
+      "R_net": -1.0,
+      "mfe": 0.22,
+      "stop_pct": 0.0245,
+      "rs": 0.0462,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-07",
+      "tkr": "VIST",
+      "R": -1.0,
+      "R_net": -1.0,
+      "mfe": 1.24,
+      "stop_pct": 0.0133,
+      "rs": -0.0056,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-11",
+      "tkr": "ARM",
+      "R": -1.0,
+      "R_net": -1.0,
+      "mfe": 0.41,
+      "stop_pct": 0.0317,
+      "rs": -0.0684,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-11-12",
+      "tkr": "ANET",
+      "R": -1.0,
+      "R_net": -1.0,
+      "mfe": 0.0,
+      "stop_pct": 0.0186,
+      "rs": -0.0719,
+      "open": false,
+      "q": "2024Q4"
+    }
+  ]
+}

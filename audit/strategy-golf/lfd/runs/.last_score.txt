@@ -1,0 +1,9 @@
+DEV  n=164  gross +0.294R  net +0.254R  win 47%  total +41.7R
+     quarters+ 4/5   top3 0.179   open 0
+     2024Q4: +0.118R (n=33)
+     2025Q1: -0.631R (n=30)
+     2025Q2: +0.867R (n=27)
+     2025Q3: +0.844R (n=21)
+     2025Q4: +0.294R (n=53)
+     PASS-bar mirror (dev): D1_net_ge_bar=Y  D2_win_ge_38=Y  D3_net_positive=Y  D4_top3_le_60=Y  D5_n_ge_150=Y
+     -> score_dev.json

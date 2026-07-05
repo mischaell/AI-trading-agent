@@ -1,0 +1,231 @@
+{
+  "strategy": {
+    "filter": "medium",
+    "exit_model": "runner",
+    "target_R": 3,
+    "regime_gate": false,
+    "rs_floor": null,
+    "rs_ceiling": null,
+    "fx_roundtrip_pct": 1.5
+  },
+  "goal": {
+    "beat_R_net_OOS": 0.176,
+    "min_win": 0.38,
+    "baseline_R": 0.147,
+    "uplift_required": 0.2
+  },
+  "full_sample": {
+    "gross": {
+      "n": 90,
+      "expectancy": 1.759,
+      "win": 0.3667,
+      "total": 158.31
+    },
+    "net": {
+      "n": 90,
+      "expectancy": 1.1788,
+      "win": 0.3556,
+      "total": 106.09
+    }
+  },
+  "train": {
+    "n": 62,
+    "expectancy": 1.1877,
+    "win": 0.3387,
+    "total": 73.64
+  },
+  "test_OOS": {
+    "n": 28,
+    "expectancy": 1.1592,
+    "win": 0.3929,
+    "total": 32.46
+  },
+  "by_quarter": {
+    "2024Q4": {
+      "n": 7,
+      "expectancy": -3.698
+    },
+    "2025Q1": {
+      "n": 6,
+      "expectancy": -1.8557
+    },
+    "2025Q2": {
+      "n": 7,
+      "expectancy": 14.3029
+    },
+    "2025Q3": {
+      "n": 7,
+      "expectancy": 4.8053
+    },
+    "2025Q4": {
+      "n": 18,
+      "expectancy": -0.6387
+    },
+    "2026Q1": {
+      "n": 14,
+      "expectancy": -0.9771
+    },
+    "2026Q2": {
+      "n": 31,
+      "expectancy": 1.1139
+    }
+  },
+  "regimes_positive": "3/7",
+  "top3_concentration": 1.019,
+  "open_trades": 7,
+  "self_reported": {
+    "net_full": 1.1788,
+    "net_OOS": 1.1592,
+    "net_train": 1.1877,
+    "beats_goal_OOS": true,
+    "positive_train_test_full": true
+  },
+  "n_total": 90,
+  "ledger_top": [
+    {
+      "date": "2025-05-05",
+      "tkr": "HOOD",
+      "R": 68.518,
+      "R_net": 67.686,
+      "mfe": 86.33,
+      "stop_pct": 0.018,
+      "rs": 0.1853,
+      "open": false,
+      "q": "2025Q2"
+    },
+    {
+      "date": "2026-04-29",
+      "tkr": "ORCL",
+      "R": 22.677,
+      "R_net": 21.163,
+      "mfe": 54.5,
+      "stop_pct": 0.0099,
+      "rs": 0.0179,
+      "open": false,
+      "q": "2026Q2"
+    },
+    {
+      "date": "2025-09-25",
+      "tkr": "SNOW",
+      "R": 21.344,
+      "R_net": 19.249,
+      "mfe": 39.1,
+      "stop_pct": 0.0072,
+      "rs": 0.1042,
+      "open": false,
+      "q": "2025Q3"
+    },
+    {
+      "date": "2025-04-30",
+      "tkr": "SPOT",
+      "R": 19.307,
+      "R_net": 17.932,
+      "mfe": 31.8,
+      "stop_pct": 0.0109,
+      "rs": 0.0348,
+      "open": false,
+      "q": "2025Q2"
+    },
+    {
+      "date": "2026-05-18",
+      "tkr": "ARM",
+      "R": 10.994,
+      "R_net": 10.703,
+      "mfe": 20.64,
+      "stop_pct": 0.0516,
+      "rs": 0.1619,
+      "open": true,
+      "q": "2026Q2"
+    },
+    {
+      "date": "2026-04-09",
+      "tkr": "APLD",
+      "R": 10.95,
+      "R_net": 10.619,
+      "mfe": 20.2,
+      "stop_pct": 0.0453,
+      "rs": 0.017,
+      "open": false,
+      "q": "2026Q2"
+    },
+    {
+      "date": "2025-05-09",
+      "tkr": "CRWD",
+      "R": 11.597,
+      "R_net": 10.616,
+      "mfe": 17.96,
+      "stop_pct": 0.0153,
+      "rs": 0.0861,
+      "open": false,
+      "q": "2025Q2"
+    },
+    {
+      "date": "2026-05-12",
+      "tkr": "ARM",
+      "R": 9.719,
+      "R_net": 9.473,
+      "mfe": 18.0,
+      "stop_pct": 0.0611,
+      "rs": 0.1941,
+      "open": true,
+      "q": "2026Q2"
+    }
+  ],
+  "ledger_worst": [
+    {
+      "date": "2024-12-05",
+      "tkr": "AA",
+      "R": -7.711,
+      "R_net": -9.503,
+      "mfe": 2.03,
+      "stop_pct": 0.0084,
+      "rs": 0.0091,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2026-04-09",
+      "tkr": "FSLY",
+      "R": -7.182,
+      "R_net": -7.814,
+      "mfe": 7.56,
+      "stop_pct": 0.0237,
+      "rs": 0.443,
+      "open": false,
+      "q": "2026Q2"
+    },
+    {
+      "date": "2026-06-01",
+      "tkr": "INTC",
+      "R": -4.65,
+      "R_net": -5.533,
+      "mfe": 5.8,
+      "stop_pct": 0.017,
+      "rs": 0.1081,
+      "open": false,
+      "q": "2026Q2"
+    },
+    {
+      "date": "2024-11-27",
+      "tkr": "CAVA",
+      "R": -4.329,
+      "R_net": -5.302,
+      "mfe": 5.16,
+      "stop_pct": 0.0154,
+      "rs": 0.0217,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2025-10-03",
+      "tkr": "ALAB",
+      "R": -1.906,
+      "R_net": -4.273,
+      "mfe": 23.46,
+      "stop_pct": 0.0063,
+      "rs": 0.0622,
+      "open": false,
+      "q": "2025Q4"
+    }
+  ]
+}

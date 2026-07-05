@@ -1,0 +1,7 @@
+HOLDOUT (2026)  n=96  net -0.001R  win 44%  total -0.1R  top3 None
+  FAIL  H1_holdout_net_ge_bar  (-0.0009)
+  PASS  H2_holdout_win_ge_38  (0.4375)
+  FAIL  H3_all_splits_positive  ({'dev': 0.2543, 'holdout': -0.0009, 'full': 0.1601})
+  FAIL  H4_top3_le_60  ({'dev': 0.179, 'holdout': None})
+  PASS  H5_dev_n_ge_150  (164)
+  OVERALL: FAIL   -> runs/holdout-result.json

@@ -1,0 +1,93 @@
+{
+  "strategy": {
+    "filter": "clean",
+    "exit_model": "scale",
+    "t1": 1.0,
+    "f1": 0.5,
+    "t2": 4,
+    "dband": 1.0
+  },
+  "holdout": {
+    "n": 96,
+    "gross": 0.032,
+    "net": -0.0009,
+    "win": 0.4375,
+    "total": -0.09,
+    "by_quarter": {
+      "2026Q1": {
+        "n": 23,
+        "expectancy": -0.2275
+      },
+      "2026Q2": {
+        "n": 73,
+        "expectancy": 0.0705
+      }
+    },
+    "q_pos": "1/2",
+    "top3_concentration": null,
+    "open_trades": 4
+  },
+  "dev": {
+    "n": 164,
+    "gross": 0.2944,
+    "net": 0.2543,
+    "win": 0.4695,
+    "total": 41.71,
+    "by_quarter": {
+      "2024Q4": {
+        "n": 33,
+        "expectancy": 0.1183
+      },
+      "2025Q1": {
+        "n": 30,
+        "expectancy": -0.6308
+      },
+      "2025Q2": {
+        "n": 27,
+        "expectancy": 0.8674
+      },
+      "2025Q3": {
+        "n": 21,
+        "expectancy": 0.8438
+      },
+      "2025Q4": {
+        "n": 53,
+        "expectancy": 0.2942
+      }
+    },
+    "q_pos": "4/5",
+    "top3_concentration": 0.179,
+    "open_trades": 0
+  },
+  "full_net": 0.1601,
+  "pass_bar": {
+    "H1_holdout_net_ge_bar": [
+      false,
+      -0.0009
+    ],
+    "H2_holdout_win_ge_38": [
+      true,
+      0.4375
+    ],
+    "H3_all_splits_positive": [
+      false,
+      {
+        "dev": 0.2543,
+        "holdout": -0.0009,
+        "full": 0.1601
+      }
+    ],
+    "H4_top3_le_60": [
+      false,
+      {
+        "dev": 0.179,
+        "holdout": null
+      }
+    ],
+    "H5_dev_n_ge_150": [
+      true,
+      164
+    ]
+  },
+  "overall": false
+}

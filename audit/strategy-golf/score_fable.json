@@ -1,0 +1,231 @@
+{
+  "strategy": {
+    "filter": "all",
+    "exit_model": "runner",
+    "target_R": 3,
+    "regime_gate": true,
+    "rs_floor": null,
+    "rs_ceiling": null,
+    "fx_roundtrip_pct": 1.5
+  },
+  "goal": {
+    "beat_R_net_OOS": 0.176,
+    "min_win": 0.38,
+    "baseline_R": 0.147,
+    "uplift_required": 0.2
+  },
+  "full_sample": {
+    "gross": {
+      "n": 305,
+      "expectancy": 2.7298,
+      "win": 0.2984,
+      "total": 832.58
+    },
+    "net": {
+      "n": 305,
+      "expectancy": 2.1698,
+      "win": 0.2787,
+      "total": 661.8
+    }
+  },
+  "train": {
+    "n": 213,
+    "expectancy": 3.1563,
+    "win": 0.277,
+    "total": 672.29
+  },
+  "test_OOS": {
+    "n": 92,
+    "expectancy": -0.1141,
+    "win": 0.2826,
+    "total": -10.5
+  },
+  "by_quarter": {
+    "2024Q4": {
+      "n": 60,
+      "expectancy": 5.5721
+    },
+    "2025Q1": {
+      "n": 40,
+      "expectancy": -1.5973
+    },
+    "2025Q2": {
+      "n": 30,
+      "expectancy": 5.0783
+    },
+    "2025Q3": {
+      "n": 21,
+      "expectancy": 5.5664
+    },
+    "2025Q4": {
+      "n": 53,
+      "expectancy": -0.1124
+    },
+    "2026Q1": {
+      "n": 27,
+      "expectancy": 4.0279
+    },
+    "2026Q2": {
+      "n": 74,
+      "expectancy": 0.2611
+    }
+  },
+  "regimes_positive": "5/7",
+  "top3_concentration": 0.936,
+  "open_trades": 13,
+  "self_reported": {
+    "net_full": 2.1698,
+    "net_OOS": -0.1141,
+    "net_train": 3.1563,
+    "beats_goal_OOS": false,
+    "positive_train_test_full": false
+  },
+  "n_total": 305,
+  "ledger_top": [
+    {
+      "date": "2024-12-05",
+      "tkr": "SQQQ",
+      "R": 247.796,
+      "R_net": 246.863,
+      "mfe": 248.41,
+      "stop_pct": 0.0161,
+      "rs": -0.2302,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2024-12-06",
+      "tkr": "SQQQ",
+      "R": 222.189,
+      "R_net": 221.334,
+      "mfe": 229.17,
+      "stop_pct": 0.0176,
+      "rs": -0.1184,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2026-01-09",
+      "tkr": "SOLT",
+      "R": 151.173,
+      "R_net": 151.026,
+      "mfe": 214.01,
+      "stop_pct": 0.1019,
+      "rs": -0.0597,
+      "open": false,
+      "q": "2026Q1"
+    },
+    {
+      "date": "2025-05-05",
+      "tkr": "HOOD",
+      "R": 68.518,
+      "R_net": 67.686,
+      "mfe": 86.33,
+      "stop_pct": 0.018,
+      "rs": 0.1853,
+      "open": false,
+      "q": "2025Q2"
+    },
+    {
+      "date": "2025-09-25",
+      "tkr": "AMD",
+      "R": 57.661,
+      "R_net": 55.74,
+      "mfe": 87.33,
+      "stop_pct": 0.0078,
+      "rs": -0.0755,
+      "open": false,
+      "q": "2025Q3"
+    },
+    {
+      "date": "2025-05-06",
+      "tkr": "HOOD",
+      "R": 33.97,
+      "R_net": 33.538,
+      "mfe": 42.98,
+      "stop_pct": 0.0347,
+      "rs": 0.2427,
+      "open": false,
+      "q": "2025Q2"
+    },
+    {
+      "date": "2025-10-07",
+      "tkr": "CLS",
+      "R": 25.583,
+      "R_net": 23.998,
+      "mfe": 57.26,
+      "stop_pct": 0.0095,
+      "rs": -0.0866,
+      "open": false,
+      "q": "2025Q4"
+    },
+    {
+      "date": "2026-04-29",
+      "tkr": "ORCL",
+      "R": 22.677,
+      "R_net": 21.163,
+      "mfe": 54.5,
+      "stop_pct": 0.0099,
+      "rs": 0.0179,
+      "open": false,
+      "q": "2026Q2"
+    }
+  ],
+  "ledger_worst": [
+    {
+      "date": "2024-11-12",
+      "tkr": "ANET",
+      "R": -40.476,
+      "R_net": -41.284,
+      "mfe": 0.0,
+      "stop_pct": 0.0186,
+      "rs": -0.0719,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2026-01-21",
+      "tkr": "CVNA",
+      "R": -20.914,
+      "R_net": -21.307,
+      "mfe": 0.0,
+      "stop_pct": 0.0382,
+      "rs": -0.0486,
+      "open": false,
+      "q": "2026Q1"
+    },
+    {
+      "date": "2026-05-27",
+      "tkr": "NVDA",
+      "R": -8.986,
+      "R_net": -13.335,
+      "mfe": 28.25,
+      "stop_pct": 0.0034,
+      "rs": -0.1075,
+      "open": false,
+      "q": "2026Q2"
+    },
+    {
+      "date": "2024-12-05",
+      "tkr": "AA",
+      "R": -7.711,
+      "R_net": -9.503,
+      "mfe": 2.03,
+      "stop_pct": 0.0084,
+      "rs": 0.0091,
+      "open": false,
+      "q": "2024Q4"
+    },
+    {
+      "date": "2026-04-09",
+      "tkr": "FSLY",
+      "R": -7.182,
+      "R_net": -7.814,
+      "mfe": 7.56,
+      "stop_pct": 0.0237,
+      "rs": 0.443,
+      "open": false,
+      "q": "2026Q2"
+    }
+  ]
+}

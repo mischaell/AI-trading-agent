@@ -1,0 +1,952 @@
+=== 2026-05-13T02:27 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [11/12]
+
+═══════════════════════════════
+
+**THE MARKET PICTURE** (5-pillars checklist)
+
+**1. $QQQ Price Action** — `risk-on`
+• Trend up, closed 707.24 near the highs after a give-back day — that's a dip i'm buying bar, not a sellers' bar
+• Extension is real — 3.59 ATRs off 21ema, almost 8 off 10wma. Not chasing green here, want adds on intraday flushes
+
+**2. Breadth Regime** — `neutral`
+• MCSI flat on 10dma at 0.42 — expansion stalling, regime in limbo
+• MCO neutral at -0.63, rolling off the early-May thrust — fewer names participating each session
+
+**3. Internals** — `risk-on`
+• Credit Spreads (1.03) and VIX (17.99) both downtrending below declining 21dma-structure — retest-and-reject behavior held
+• BTC at 80,913, uptrend above rising 21dma-structure — offense-side confirmation
+
+**4. Liquid Leaders Action** — `risk-on`
+• Semis sweeping the top 5 themes, Power and Memory anchoring at +33% monthly. Setups clustering at 21dma-structure
+• Trophy carries ($AVGO, $JBL, $LITE, $CRWV) still trending — no red flags in leadership
+
+**5. Portfolio & NER Feedback** — `risk-on`
+• NER +0.78%, Open Heat 12.1%, Closed Delta +16.50% on the cycle. LLs supported at 21dma-structures with strong closes — added GEV, ONTO, ARM into the flush. Tape paid for engagement today
+
+═══════════════════════════════
+
+**THE GAMEPLAN**
+
+Red day, and that's OK — part of the game to ride a trend. What I saw in the liquid leaders is what mattered: supported at 21dma-structures, base structures, shakeouts holding, strong closes in daily range. That's the information I was looking for, and I got it. Paired with the rejection of declining 21dma-structure on Credit Spreads and VIX, the backdrop stays clean. **Opportunity until proven otherwise.**
+
+The **make-or-break pillar is breadth**. MCSI flat on the 10dma and MCO rolling off the thrust — regime in limbo. Either MCO hooks and pulls MCSI back up, or MCSI breaks under a declining 10dma and confirms contraction. That's what tells me whether this give-back was day one of something larger or just another shakeout that gets bought.
+
+For now i'm leaning into what's working — adding to leaders on flushes into rising 21dma-structure, not chasing green bars up here with $QQQ 3.59 ATRs extended. Defense kicks in if internals crack (CS or VIX reclaiming declining structure) or if MCSI rolls under a falling 10dma. Until then, **buying weakness, not chasing strength**.
+
+═══════════════════════════════
+
+**TOP IDEAS FOCUS LIST**
+
+Focus is on names at or near rising 21dma-structure — that's where the risk/reward lives in an extended tape.
+
+• **$LITE** 100 — Communication Equipment (pulled in toward rising structure today, -5.77%)
+• **$BE** 98 — Electrical Equipment (extended, watching for a flush into structure)
+• **$AVGO** 97 — Semiconductors (sitting just above rising 21dma-structure after the -2.13% give-back)
+• **$ALAB** 97 — Semiconductors (pulled into rising structure on today's red bar)
+• **$ALGM** 93 — Semiconductors (sharp -5.21% flush, testing rising 21dma-structure)
+• **$ONTO** 91 — Semiconductors (back at rising 21dma-structure after -3.28% — clean test)
+• **$SEI** 90 — Oil & Gas Equipment (pulled into rising structure, -1.41%)
+• **$AEHR** 89 — Semiconductors (extended, want it to come in)
+```
+
+=== 2026-05-13T02:27 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-512?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/12 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-14T01:25 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [05/13]
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on**
+- Lockout trend, closed 714.71 at new ATHs with daily reversal off the intraday dip. Trend keeps refusing to give a clean entry.
+- Extension back to crazy: ATR Dist. 21ema 3.88, 10wma 7.52. Miles above 21dma-structure near 666. Watching 675.97 as first real test.
+
+**2. Breadth Regime — mixed**
+- MCSI downtrend below 10dma, neutral z-score (0.33 vs 0.43). Breadth contracting under the surface.
+- MCO neutral at -0.85, rolling toward oversold. Recent +2σ thrust already worked off.
+
+**3. Internals — risk-on**
+- CS (1.0285) and VIX (17.87) both downtrend below declining 21dma-structure. Rejection of those lines yesterday is the cleanest tell credit isn't cracking.
+- BTC (79,580) uptrend above rising 21dma-structure, retesting the line. Offense-side confirmation as long as it holds.
+
+**4. Liquid Leaders Action — risk-on**
+- Semis sweeping top 4 RS slots (+34% monthly), broad constituent strength. Setups clustering at 21dma-structure across Power, Memory, Equipment, Analog.
+- Grid Infrastructure ($GEV, $ETN) as cleanest non-semi pocket. No red flags in the rotation. **Leaders continuing to set up and follow through is feedback too.**
+
+**5. Portfolio & NER Feedback — risk-on, managed**
+- NER +0.44% (+0.25% Delta), Open Heat 13.54%, Closed Delta +16.81% this cycle. Reduced NER & exposure into the close. Doing less is more in a thinner grind-up tape.
+
+## THE GAMEPLAN
+
+**Extended but not tired.** $QQQ is sitting at 3.88 ATRs off the 21ema with internals aligned risk-on and leaders still setting up cleanly. That's a tape I stay engaged with, just not aggressively. My read is the same as the data: room remains, MCO is near oversold, and the RSP/IWM rotation setup is something I'm watching as a potential broadening tell. Leaders continuing to follow through is feedback, and I respect that.
+
+The **make-or-break pillar is Breadth**. MCSI fading under the 10dma while $QQQ holds highs is the divergence to watch. A flush to MCO -2σ would be the cleanest add-back signal. If MCSI keeps fading while price holds, I get defensive faster.
+
+Posture for the next few sessions: more cautious with NER overnight given the extension, but if a strong leader gives me weakness into rising 21dma-structure, I'd rather take the trade and see if I earn cushion to hold. **Trim into strength on runners, don't chase green candles, let the tape come to me.** Defense kicks in if two internals break or if MCSI keeps fading while $QQQ stalls.
+
+## TOP IDEAS FOCUS LIST
+
+Focusing on names at or near rising 21dma-structure. That's where the asymmetry lives in an extended tape, not chasing extended leaders.
+
+- **$WULF** (102) — Financial / Capital Markets
+- **$AVGO** (647) — Semiconductors
+- **$ALGM** (770) — Semiconductors
+- **$ENTG** (801) — Semiconductors
+- **$MP** (1382) — Industrial Materials
+
+=== 2026-05-14T01:30 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-513?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/13 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-15T02:42 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [05/14]
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on (extended)**
+- New ATH at 719.79, clean continuation through the prior swing high pivot — trend up, ATH confirmed
+- ATR Dist. 21ema at 4.03 and 10wma at 9.25 — stretched, real air down to 21dma-structure at 671
+
+**2. Breadth Regime — risk-off (divergence)**
+- MCSI below declining 10dma (z: 0.27) — breadth contraction regime, deterioration since early May
+- MCO hooked from near-oversold (-0.62) — relief setup, unconfirmed. Tomorrow tells me which side gets paid
+
+**3. Internals — risk-on (with one wrinkle)**
+- Credit Spreads 1.03 below declining 21dma-structure, VIX 17.26 at a new local low — both risk-on. CS ticked green today, noise inside a downtrend, not a signal yet
+- BTC 81,106 above rising 21dma-structure — offense side confirming cleanly
+
+**4. Liquid Leaders Action — risk-on**
+- Semis sweeping the top — Power Semis, Memory, Foundry, Analog all stacked at the top of the RS ranks
+- Setups broadening into Grid Infrastructure, Photonics/Optical, Specialty Chemicals — rotation working, not a one-group tape
+
+**5. Portfolio & NER Feedback — risk-on (managed)**
+- NER 1.5%, Open Heat 15.47%, Open Delta -1.55% — mixed action with leaders digesting, but constructive underneath. Rotated laggards into setting-up names (USAR, ALGM new; GEV added)
+
+## THE GAMEPLAN
+
+**Extended but still being paid — and I'm taking it day by day.** Price action and internals are still risk-on, semis are running the show, and setups keep showing up at rising 21dma-structure in the leading groups. That's the offense side. The wrinkle is breadth — **MCSI under a declining 10dma is the make-or-break pillar from here.** If MCO follows through tomorrow and MCSI flattens, the contraction call stalls and I stay engaged. If MCO fails and pushes back toward -2σ, that's selling accelerating and the better add zone actually sets up lower.
+
+My gut and the pillars are aligned: extended tape, leaders still setting up, but I don't want to be caught off guard with too much NER overnight. So I'm **controlling NER as my primary lever** — trimming into strength on extended names, rotating laggards into 21dma-structure setups (which is exactly what today's action was), and letting new ideas come to me on pullbacks. Not chasing 9+ ATRs over the 10wma.
+
+**Defense kicks in if MCSI keeps declining and Credit Spreads reclaim and hold above the declining 21dma** — that's the regime flip. Until then, today's CS green is a wiggle inside a downtrend, not a signal. Giveback at some point is normal, part of the game to ride a trend — I just want to give back from a managed exposure, not a max one.
+
+## TOP IDEAS FOCUS LIST
+
+Extension up here means I'm only interested in names sitting at or pulling back into rising 21dma-structure — that's where the trend pays, not where I chase it.
+
+- **$GEV** (97) — Grid Infrastructure
+- **$LSCC** (92) — Semiconductors
+- **$LITE** (99) — Communication Equipment
+- **$CRDO** (94) — Communication Equipment
+- **$ALGM** (90) — Semiconductors
+- **$USAR** (82) — Rare Earth / Industrial Materials
+
+=== 2026-05-15T02:42 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-514?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/14 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-18T03:35 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [05/17]
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — mixed**
+- Friday printed a downside reversal confirming the breadth divergence, but I'm still above a rising 21dma-structure near 674 — trend posture intact, just giving back at the top of the move
+- ATR Dist. 21ema 2.65 / 10wma 6.98 — stretched enough that a digestion bar makes sense; 710.18 reclaim flips it back to a blip, loss of 664.51 is the first real character change
+
+**2. Breadth Regime — mixed**
+- MCSI at +0.17 above a +0.40 10dma but flattening and losing slope — still constructive, momentum fading
+- MCO at -1.08, through -1σ and heading toward -2σ — working-off phase, the zone where setups historically live against a positive MCSI backdrop
+
+**3. Internals — risk-off**
+- Credit Spreads (SHY/HYG) closed above rising 21dma-structure at 1.03 — first defensive signal after weeks of compression, and credit cracks before equities
+- BTC at 76,830 testing rising 21dma-structure with a weekend close below now confirming; VIX at 18.43 still pinned below declining 21dma — the lone holdout, and vol is usually last to move
+
+**4. Liquid Leaders Action — risk-on**
+- Semis own the leadership across power, memory, foundry, analog, equipment — broad-based, not narrow
+- Top setups clustering at rising 21dma-structure (VICR, LITE, GEV, ARM, AVGO, BE) — the kind of pullback action I want to see while the index digests
+
+**5. Portfolio & NER Feedback — neutral**
+- NER 2.68% (-3.4% Delta), Open Heat 11.59%, Closed Delta +16.41% on the cycle — risk known and managed; took adds into top leaders at 21dma-structure Friday (NEW VICR, ADDED LITE) knowing the entry might fail
+
+## THE GAMEPLAN
+
+**Stress-test mode.** Market reversed Friday and price is now confirming the breadth divergence I was flagging. Credit Spreads closing above 21dma-structure is the signal that matters most — that's the one that whispers before equities crack. BTC nodded over the weekend with a close below its now-declining 21dma-structure. VIX hasn't picked up the phone yet, but it usually doesn't until last. Two of three internals flipping defensive while leaders still act constructive — that's the tension I'm sitting with.
+
+The **make-or-break pillar is Internals** — specifically whether Credit Spreads stay above the 21dma and whether VIX finally confirms. Futures are pointing to a potential red open into structure, which would push MCO and short-term breadth deeper into oversold. What I want tomorrow is that red open + oops reversal — that's the first constructive tell. If I don't see it and weakness continues into the close, I'm getting stopped out of positions and shifting to a more defensive stance.
+
+**Liquid Leaders are my priority** and they're still acting — that's what keeps me engaged with the exposure I added Friday. I could be wrong on those entries, and the risk is known and accepted. But you don't get clean fills in top leaders if you wait for every star to align. Defense kicks in for me on: loss of 664.51 with 21dma-structure breaking, MCSI rolling under a declining 10dma, or another leg of internals flipping with VIX finally catching up. Not there yet — information gathering market, pullback still in progress.
+
+## TOP IDEAS FOCUS LIST
+
+These are the names I'm focused on as the tape works off extension into rising 21dma-structure — pullback buys in leaders, never chasing.
+
+- **$LITE** (100) — Photonic ICs / Optical Components
+- **$GEV** (100) — Grid Infrastructure
+- **$BE** (98) — Hydrogen / Electrical Equipment
+- **$ARM** (98) — Semiconductors
+- **$VICR** (98) — Power Semiconductors
+- **$AVGO** (96) — AI Infrastructure / Semis
+
+=== 2026-05-18T03:36 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-517?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/17 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-19T03:10 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [05/18]
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — mixed**
+- Uptrend still intact above rising 21dma-structure, but two big breakdown days have me in a potential higher-low range between 694/714.
+- Watching that range hold to define a digestion of the recent lockout. Break under 696 opens a run to 21dma-structure.
+
+**2. Breadth Regime — mixed**
+- MCSI still below a declining 10dma — breadth contraction regime.
+- MCO hook-up from oversold on $QQQ, and an even deeper oversold print on the LLs (-1.95σ). That's my bread and butter signal if it materializes.
+
+**3. Internals — mixed**
+- Credit Spreads still living above a rising 21dma-structure — that's the caution flag I can't ignore.
+- VIX gave a clean rejection of swing high and declining 21dma-structure today — risk-on tell. BTC still under a declining 21dma-structure — risk-off.
+
+**4. Liquid Leaders Action — mixed**
+- Leadership concentrated in Semis & Hardware — Memory, Foundry, Equipment all running. Top setups clustering at rising 21dma-structure.
+- Some leaders starting to crack below structure, but not the majority yet. Next few sessions tell me if this is digestion or distribution.
+
+**5. Portfolio & NER Feedback — neutral**
+- Cut ONTO, ALGM, USAR into the close. Added ARM, BE. Reducing exposure while staying well-exposed — I've got cushion from the cycle low.
+- LITE and VICR sitting right at structure low — judgment calls tomorrow.
+
+## THE GAMEPLAN
+
+**Stress-test mode.** The trend is still up and the move down was overdue after that lockout run — this is the kind of giveback I'd expect, and it's part of the game to ride a trend. But two breakdown days plus leaders starting to wobble means I'm not pretending it's all clean. **I'm optimistic, not complacent** — the LLs MCO deep oversold print is my bread and butter, VIX rejected, and structure on $QQQ is still holding in the range. That's a bet worth taking with the cushion I have.
+
+**The make-or-break pillar is Liquid Leaders Action.** If leaders keep cracking under 21dma-structure tomorrow, this turns from healthy digestion into something uglier — and that's when I tighten up further toward a near-cash posture. If structures hold and get defended, I stay patient and let the oversold bounce setup do its work.
+
+**No hero plays here.** I'm letting setups come to me on pullbacks into rising 21dma-structure, not chasing anything extended. Defense kicks in for me if Credit Spreads break to new highs while $QQQ loses 696 — that combo flips the read.
+
+## TOP IDEAS FOCUS LIST
+
+In this regime, I'm only interested in names sitting at or near rising 21dma-structure — that's where my edge lives, never chasing.
+
+- **$LSCC** (328) — Semiconductors
+- **$VIAV** (181) — Communication Equipment
+- **$CF** (1075) — Agricultural Inputs
+- **$ARM** (619) — Semiconductors
+- **$BE** (12) — Electrical Equipment
+- **$INTC** (80) — Semiconductors
+
+=== 2026-05-19T03:11 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-518?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/18 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-20T01:59 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [05/19]
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on**
+- Uptrend above rising **21dma-structure**. The 694/714 range held on the bottom-area retest — last night's scenario played out.
+- Held the 696 pivot, constructive character. Sideways digestion here wouldn't bother me.
+
+**2. Breadth Regime — risk-off**
+- MCSI still downtrending below a declining 10dma — contraction regime.
+- MCO hooked down today; breadth weak even as price held. The divergence I'm watching.
+
+**3. Internals — mixed**
+- Credit Spreads above rising **21dma-structure** but rejected at the initial break-zone — KEY spot. VIX tight inside structure.
+- BTC tightening into its 21dma-structure area. Coiling, not breaking.
+
+**4. Liquid Leaders Action — risk-on**
+- Textbook oversold bounce — LLs tagged **21dma-structure** and snapped back off a -3σ MCO open. Setups clustering at rising structure.
+- Strength deep across Semis — Foundry, Memory, Semi Equipment all coiling. Specialty Chemicals (5/5) and Optical Components (4/5) cleanest.
+
+**5. Portfolio & NER Feedback — mixed**
+- Cut into strength to reduce NER and exposure — trimmed VRT/QBTS/ORCL, exited GEV/VICR, added COHR/ARM, new AFRM long at structure. Freeing room to rotate into the real leaders.
+
+## THE GAMEPLAN
+
+**Stress-test mode.** Three pillars risk-on — QQQ holding structure, LLs bouncing clean off oversold, internals leaning constructive — but breadth is the holdout, and that's the disconnect I can't ignore. Price held 696 and the LLs gave me a textbook bounce off a -3σ MCO, so the tape did its work today. We might have seen the worst of the selling.
+
+The **make-or-break pillar is Breadth** — MCSI below a declining 10dma with MCO hooking down. If it repairs and turns its 10dma up, this decouples higher and the risk-on majority confirms. If breadth keeps deteriorating while price clings on, the bounce was a one-day reflex, not a base. Credit Spreads rejecting at that break-zone is my secondary watch — a spike through is the big red flag.
+
+For the next few sessions I'm letting setups come to me — **not forcing anything.** I want leaders showing strength right here at rising **21dma-structure**, since this is the phase where real leadership pops. I freed up room today rather than adding size, so I'm set to rotate into merchandise on pullbacks. **Defense kicks in if breadth and internals break together.**
+
+## TOP IDEAS FOCUS LIST
+
+These are my names — I focus on the ones at or pulling into rising **21dma-structure**, where the cleanest entries show up without chasing.
+
+- **$BE** (16) — Industrials / Electrical Equipment
+- **$CIEN** (34) — Technology / Communication Equipment
+- **$INTC** (61) — Technology / Semiconductors
+- **$NVTS** (76) — Technology / Semiconductors
+- **$HUT** (95) — Financial Services / Capital Markets
+- **$VIAV** (188) — Technology / Communication Equipment
+- **$CAT** (238) — Industrials / Agricultural Machinery
+- **$APLD** (266) — Technology / Information Technology Services
+- **$SANM** (389) — Technology / Hardware, Equipment & Parts
+- **$LUNR** (444) — Industrials / Aerospace & Defense
+- **$GFS** (773) — Technology / Semiconductors
+- **$AFRM** (2313) — Technology / Software - Infrastructure
+
+Structure note: **$NVTS, $VIAV, $APLD, $AFRM, $GFS** are near rising 21dma-structure — cleanest structure-buys. **$BE, $CIEN, $HUT, $CAT, $SANM, $LUNR** look extended after the run — not chasing, just on the radar for a pullback.
+
+=== 2026-05-20T01:59 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-519?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/19 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-21T02:13 ===
+# SITUATIONAL AWARENESS, GAMEPLAN & TOP IDEAS [05/20]
+
+## THE PICTURE (5 pillars)
+
+**1. $QQQ Price Action — risk-on**
+Uptrend above rising **21dma-structure**. Confirmed a daily reversal with a strong push and close right up against the 714.59 top-range. Not stretched — a breakout would confirm continuation, but more time in range here wouldn't bother me either.
+
+**2. Breadth Regime — mixed**
+MCSI still in a downtrend below a declining 10dma — contraction regime, hasn't flipped. But MCO hooked up off oversold and breadth ran +90th GDB — almost flipped MCSI up in a single day. That's the coil.
+
+**3. Internals — risk-on**
+Credit Spreads gave a big rejection of the structure and broke back below the **21dma-structure**, closing at the lows. VIX breakdown alongside — both risk-on, real conviction booster into the close even with NVDA on deck. BTC's the laggard — daily reversal off base but still below structure, work to do to reclaim.
+
+**4. Liquid Leaders — risk-on**
+Price daily reversal above a rising **21dma-structure** plus a solid hook from deep oversold. Setups clustering at structure across Semis (Memory/Foundry leading), Optical and Crypto Infra coiling underneath. Healthy rotation, no red flags.
+
+**5. Portfolio & NER — risk-on**
+Getting paid for the exposure I carried into the reconfirmation. Rotating into the strongest merchandise, trimming the extended, cut LITE on lost structure. NER under control — tape's rewarding patience.
+
+## THE GAMEPLAN
+
+**This is the textbook anticipation setup paying off.** Market ran hard off the April low, started giving it back around April 17, and now price, internals, leaders, and PF feedback are all lining up for a reconfirmation of the trend out of an oversold condition. That's exactly why I kept the extra exposure on — and the tape's confirming the read.
+
+**The make-or-break pillar is Breadth.** MCSI is the only holdout — still under a declining 10dma — but MCO hooked hard and we're a hair from an MCSI hook-up. If breadth confirms over the next session or two, this tightens into a clean 5/5. That's where I'm looking next. BTC reclaiming **21dma-structure** is the secondary tell.
+
+So **panda time — patience.** I'm not adding here. Next few days I derisk into strength, trim the carried exposure down as the market pushes, then mostly do nothing and let what's working work. **Defense kicks in if Internals or Breadth roll back risk-off** — Credit Spreads reclaiming structure would be the warning. Until then I let it ride and stay patient.
+
+## TOP IDEAS FOCUS LIST
+
+Leaders sitting at or near rising **21dma-structure** — cleanest risk/reward on a continuation. I let them come to me on pullbacks, never chase.
+
+- **$CAT** (100) — Ag Machinery
+- **$NBIS** (98) — Internet Content
+- **$COHR** (98) — Optical
+- **$IBKR** (95) — Brokers
+- **$CRCL** (94) — Capital Markets
+- **$LUNR** (86) — Aerospace & Defense
+- **$OUST** (82) — Lidar
+- **$AFRM** (74) — Fintech
+
+=== 2026-05-21T02:15 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-520?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/20 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-22T03:04 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS 5/21
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on**
+- Trend's up and glued to a rising **21dma-structure** — new high above yesterday's, closed strong right into the 714 range top.
+- Extension's no concern: ATR Dist. 21ema 2.28, 10wma 7.36 — ahead of the weekly anchor, room left on the daily. Structure near 683 keeps it honest.
+
+**2. Breadth Regime — risk-on**
+- MCSI hooking **up through a flattening 10dma** (0.08 vs 0.30) — the week's contraction read rolling into expansion.
+- MCO neutral at 0.14, no extreme. Regime's doing the work; wants a follow-through day to lock the flip.
+
+**3. Internals — mixed (2/3 risk-on)**
+- Credit Spreads 1.03, below a declining structure, rejecting the retest twice — cleanest signal here. VIX 16.76 broke down and confirms.
+- BTC 77,563, still below its declining structure — the lone laggard. A reclaim flips this to a clean 3/3.
+
+**4. Liquid Leaders Action — risk-on**
+- Composite above rising **21dma-structure**, +2.67% day, leaders bought on the dip. Setups clustering at the band — $STX, $CIEN, $MU riding it; $MXL, $APLD, $DOCN breaking out.
+- Semis own the tape — Memory and Foundry leading, photonics coiling clean at support. No red flags.
+
+**5. Portfolio & NER Feedback — risk-on**
+- Biggest EC day of my career and the tape paid the aggression. EOD trims pulled me from ~20% open heat back to a reasonable 15%. Holding $CRCL & $AFRM as NER at 0.878%. Trend reconfirmed off the 714 pivot.
+
+## THE GAMEPLAN
+
+**Lockout trend, and I'm keeping it simple.** Five pillars line up risk-on — only BTC lags, and that's noise against credit and breadth both confirming. Today was the culmination of the move I anticipated on the pullback: no new exposure, got aggressive when it mattered, trimmed hard into the close like I do when the market breaks out. Already positioned, catching the momentum — now the job is to let it work.
+
+My read and the pillars are in lockstep, so I'll let it color everything: **be patient, no new trades.** The tape's rewarding *fewer* new positions, not more — chopping myself in at new highs is how I repeat recent mistakes. I'm reducing into strength as we make new highs, banking it while it's there, and preparing to reengage when weakness shows. **When there's fear on the street, blood on the street — that's when I want dry powder for the next leg.**
+
+**The make-or-break pillar is Internals — specifically BTC.** A reclaim of its rising 21dma flips internals clean to 3/3. The flip that'd actually break the thesis is **credit cracking** — Spreads reclaiming structure is my tell to defend. Until then I'm watching the 714 pivot: hold or build a higher low and I stay in good position. Giveback days are fine — that's the price of riding a trend.
+
+## TOP IDEAS FOCUS LIST
+
+These are the names I want showing up on pullbacks into rising **21dma-structure** — buying the dip in leaders, never chasing extension.
+
+- **$LITE** (22) — Communication Equipment
+- **$WULF** (73) — Capital Markets
+- **$AAOI** (77) — Semiconductors
+- **$CAT** (280) — Ag Machinery
+- **$PWR** (540) — Engineering & Construction
+- **$IBKR** (574) — Investment Banking
+- **$Q** (826) — Semiconductors
+- **$FLY** (1567) — Aerospace & Defense
+- **$AFRM** (2318) — Software Infrastructure
+- **$CRCL** (2526) — Capital Markets
+
+=== 2026-05-22T03:04 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-521?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/20 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-25T15:21 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [05/25]
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on**
+- Trend's up and riding above a rising **21dma-structure**, printed a fresh all-time high. Got rejected at 722.03 into Friday and consolidated just below — normal profit-taking into a long weekend.
+- Extended on the longer measure (ATR Dist. 10wma at 6.65) but 21ema dist. only 2.38 — stretched, not a back-off signal. Shelves at 714.59, then 696.64, with 21dma-structure tracking up around 692.
+
+**2. Breadth Regime — risk-on**
+- MCSI uptrend intact — sitting just below a declining 10dma near-term, but the two-day hook (Thu/Fri) is working to reclaim early this week. Expansion regime, not a regime change.
+- MCO neutral at +0.42 — no extreme, plenty of room before overbought.
+
+**3. Internals — risk-on**
+- Credit Spreads (1.03) and VIX (16.70) both below declining 21dma-structure — clean risk-on, no credit cracks, fear bid gone.
+- BTC (77,473) testing 21dma-structure from below, pressing for a reclaim. The lone offside read — a reclaim this week flips internals to 3/3 clean.
+
+**4. Liquid Leaders Action — risk-on**
+- LL Composite riding above a rising **21dma-structure**, fresh high (C: 440.50, +3.03%). $WDC, $CIEN, $MU showing the cleanest structure. Setups clustering in Semis & Hardware — Memory, Analog, Photonics coiling at the band.
+- One wobble: $SATS slipped back into its band on a -3.30% day while the group held. Worth watching, not a flag.
+
+**5. Portfolio & NER Feedback — risk-on (defensively positioned)**
+- Came down from 150% → 110% at the highs, then to 85% for the weekend — paid myself into strength. NER corrected to 0.2%, off margin, then took it back to 100% exposure on a capital wire-out. Tape's paying; I'm choosing to bank rather than press.
+
+## THE GAMEPLAN
+
+**Lockout trend, and I'm keeping it simple.** All five pillars are lined up risk-on — new all-time high, breadth expanding, internals clean with BTC one reclaim away from 3/3, and leaders pushing into new highs. Everything looks good, and I'm not arguing with it. But QQQE is running **3.5x ATR off the 21ema** and north of 7x off the 50ma, and that's the number governing my posture here.
+
+My game doesn't change just because the tape's green. **I'm trimming into strength and reducing exposure** — the more I can take down this week into this stretch, the better positioned I am when a stress-test or pullback eventually hits. I don't chase up here. New ideas come to me on pullbacks into rising **21dma-structure**, not by reaching for extension. Giveback days are fine when they come — that's part of riding a trend.
+
+The **make-or-break pillar is the BTC reclaim in Internals** — that's the one that flips the read from clean to fully confirmed, and it's where I'm looking next. Defense kicks in for me if Internals or Breadth break — a BTC rejection that leaves offense offside while CS/VIX hold, or the MCSI failing to reclaim its 10dma. Until then I stay engaged but light, sitting on dry powder, ready to push exposure back into margin on the pullback I'm waiting for.
+
+## TOP IDEAS FOCUS LIST
+
+These are the names I want — and in this stretch I'm only interested in them on pullbacks into rising **21dma-structure**, not chasing extension.
+
+- **$AAOI** (75) — Semiconductors
+- **$CAT** (216) — Agricultural Machinery
+- **$NVT** (273) — Electrical Equipment & Parts
+- **$TWLO** (435) — Software / Infrastructure
+- **$PWR** (528) — Engineering & Construction
+- **$KEYS** (538) — Hardware, Equipment & Parts
+- **$NVDA** (1182) — Semiconductors
+- **$CRCL** (2570) — Capital Markets / Crypto Infrastructure
+
+=== 2026-05-25T15:21 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-525?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/25 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-27T01:33 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS 5/26
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on**
+New ATH today, +1.78%, clean uptrend above a rising 21dma-structure. No fighting this.
+But I'm getting the extension talk again — ATR Dist. 21ema at 3.18, 10wma near 7.69. Stretched up here, structure's running well below near 690. Right now isn't the spot to chase.
+
+**2. Breadth Regime — risk-on**
+MCSI turning up, crossing its 10dma — breadth tilting into expansion.
+MCO hooked down, no extreme. Net decliners beat advancers but up-stocks were strong, new highs solid — narrow, high-quality bid. Day says divergence; I want follow-through tomorrow to erase it.
+
+**3. Internals — risk-on (2/3)**
+Credit Spreads 1.03, pressing fresh lows below declining structure — the cleanest signal on the board and the one that matters most. VIX 17.01 below declining structure (small +2% divergence today, not reading much into it yet).
+BTC the lone holdout — 75,839, rejected at declining structure, still offside. Offense isn't confirming yet.
+
+**4. Liquid Leaders Action — risk-on**
+LL Composite riding above a rising 21dma-structure, fresh high after a shallow pullback into the band. Clean continuation, no damage. Leaders strong despite negative decoupling.
+Setups clustering in Semis (Memory, Analog, Foundry all north of RS 99) and Photonic ICs. $SATS the lone laggard chopping below its band — the one name not acting right.
+
+**5. Portfolio & NER Feedback — risk-on**
+Clean tape, uptrend intact, breadth expanding. No moves today and that's the point — NER's working as long as positions stay aligned with the bigger structure, so I let them ride. The tape's paying me for staying put.
+
+## THE GAMEPLAN
+Opportunity until proven otherwise — but I'm not chasing up here. All five pillars are tilting risk-on, and that's the read: structure's pointing the same way across the board with BTC the lone holdout. This is exactly the phase where I used to chop myself up forcing new trades, so the plan stays simple — stay aligned with the bigger structure, let positions do their job, and be wise about where and how I push. QQQ being 3.2x ATR off the 21ema is information, not a sell signal. It just tells me new ideas come to me on resets back toward the band, not on the gap-up.
+The make-or-break pillar is Internals — specifically Credit Spreads. CS is the anchor and it's holding fresh lows, so the regime stays risk-on. The two soft spots I'm babysitting are VIX's little green-with-market divergence and BTC's rejection at declining structure. The flip comes if CS reclaims structure — that's the one that ends it. Until then, credit's calm and I ride it.
+Posture for the next few sessions: I keep risk a touch tighter given the extension, stay concentrated in names holding their rising 21dma-structure, and let the laggards lag — if something's not showing it, that's the rotation tell. Defense kicks in for me if Credit Spreads reclaim that declining structure, or if breadth fails to confirm tomorrow and the MCSI cross stalls right at the line. Neither's happening yet, so I let the book work.
+
+## TOP IDEAS FOCUS LIST
+In a risk-on tape this extended, I'm not chasing — I want these showing up on pullbacks into rising 21dma-structure, where the entries reset and the risk gets clean.
+$NBIS (153) — Internet Content & Information
+$TWLO (477) — Software / Infrastructure
+$SOLS (824) — Chemicals / Specialty
+$IBKR (914) — Investment Banking & Services
+$HWM (981) — Aerospace & Defense
+$OSCR (1000) — Healthcare Plans
+$NVDA (1402) — Semiconductors
+
+=== 2026-05-27T01:33 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-526?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/26 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-28T02:20 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [5/27]
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on**
+- New ATH yesterday, inside-ish digestion today (729.45 close), holding above 722.03 swing high. Clean uptrend above rising 21dma-structure (~692).
+- Extended ~3 ATRs off the 21ema (ATR Dist. 2.88 / 10wma 7.76) — pause here makes sense, lets the MAs catch up. Loss of 696.64 would be the first real crack.
+
+**2. Breadth Regime — mixed**
+- MCSI rolled below a flattening 10dma (0.13 vs 0.17) — breadth contraction regime, but coming off a stretched read.
+- MCO neutral at -0.23, drifting down, no extreme. Reads like digestion, not damage — waiting for the hook off oversold for the add trigger.
+
+**3. Internals — risk-on**
+- Credit Spreads 1.03 pinned near lows w/ small green divergence, VIX 16.29 breaking down from microstructure. Both under declining 21dma-structure. Clean.
+- XLK/XLP 2.18 above rising 21dma-structure, extended — offense leading, just stretched. 3/3 aligned.
+
+**4. Liquid Leaders Action — risk-on**
+- Composite still in uptrend, extended above rising 21dma-structure, pressing new highs. Leaders holding through the digestion — that's the tell.
+- Standouts clean at new highs ($SNDK, $MU, $STX, $PL, $HUT). Semis and Deep Tech owning the tape, Photonic ICs / Optical Components / Grid Infra coiling at 21dma-structure together.
+
+**5. Portfolio & NER Feedback — risk-on**
+- NER -0.20%, Open Heat -15.61%, positions have cushion. Added $NVDA today on the right side of the setup, tight SSL 210.93, EC risk -0.1%.
+- Leaders holding rising 21dma-structure through the index pause — green light to stay engaged.
+
+## THE GAMEPLAN
+
+**Market was extended coming in, got a clean digestion day, leaders are holding structure — nothing to fix here.** Price-action and internals risk-on, leaders risk-on, PF behaving — breadth is the only soft spot, and it's a hook-down from a stretched read, not a regime break. Reads like digestion, not distribution.
+
+**Make-or-break pillar is breadth** — specifically MCO working down and hooking up off oversold. That's the next add trigger. Until then, no broad action. The other thing I'm watching is whether $QQQ can press straight back to highs or needs another session or two to chew through the extension.
+
+Game plan into tomorrow is the same — **trust my exposure as long as the uptrend stays alive, and only engage on a stress-test or a pullback in a leader**, the way I did with $NVDA today. **One position at a time.** If $NVDA doesn't de-risk, I'm not even looking at other names, even if the tape goes red. But if $NVDA firms up and the market gives me some weakness, then I'll look at adding to an existing name or initiating something else from the Focus List. Tight leash on new exposure — we're extended, keep it cool, let setups come to me at rising 21dma-structure.
+
+## TOP IDEAS FOCUS LIST
+
+Focused on names sitting at or pulling back into rising 21dma-structure — that's where the risk lines up in an extended tape.
+
+- **$BE** (16) — Industrials / Electrical Equipment (Hydrogen)
+- **$AAOI** (85) — Tech / Semiconductors
+- **$DOCN** (89) — Tech / Software Infra (GPU Cloud & HPC)
+- **$GLW** (254) — Tech / Hardware (Optical Components)
+- **$OSCR** (999) — Healthcare / Medical Plans
+- **$NVDA** (1457) — Tech / Semiconductors *(added today, SSL 210.93)*
+
+=== 2026-05-28T02:21 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-527?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/27 — Evening Market Update & Strategic Insights]
+
+=== 2026-05-29T01:24 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS 5/28
+
+## THE MARKET PICTURE (5-pillars checklist)
+**1. $QQQ Price Action — risk-on**
+
+Uptrend above a rising 21dma-structure, printed a new ATH today after backtesting the recent swing high and holding it — the confirmation I wanted.
+Still a bit extended up here, but the bar's character was clean: upside reversal near the ATH, strong close. Not the deep >4x ATR stretch, so no lockout signal — just normal extension to respect.
+
+**2. Breadth Regime — risk-on**
+MCSI/Summation reclaimed its 10dma and flipped back to an uptrend — breadth expansion, and it's not overbought yet.
+Nice hookup on the MCO turning back up. This is the breadth confirmation I was waiting on, and it's what greenlit me to add today.
+
+**3. Internals — risk-on**
+Credit spreads (SHY/HYG) making new lows below declining 21dma-structure, VIX below its declining 21dma-structure — both clean risk-on, no stress in the plumbing.
+Tech vs Staples (XLK/XLP) above rising 21dma-structure at 2.18 — offense leading defense. (BTC [not provided] today, but the rest of the board is unanimous.)
+
+**4. Liquid Leaders Action — risk-on**
+Leaders holding above rising 21dma-structure, no red flags — $NVDA and the group sitting right at their 21dma-structure, good pops out of $ARM and $NBIS. Semis leading outright with Memory at RS #1.
+Cleanest follow-through setups are clustering at rising 21dma-structure in Grid Infrastructure and Photonic ICs — though photonics/opticals ran a touch weak today and leader breadth is still flat (digestion). That's where I want momentum to show up.
+
+**5. Portfolio & NER Feedback — risk-on**
+Added $CAT and $BE into the weakness, getting on the right side of names holding structure — not chasing — and trimmed a slice of $NVDA to bank yesterday's runner (4R). NER -1.02% (small new exposure on the adds), Open Heat -18.51%.
+The tape paid me for waiting: I got the dip I wanted and put it to work in the merchandise I want more of. Rotation into better stuff, not a market call.
+
+## THE GAMEPLAN
+Opportunity until proven otherwise. All five pillars are risk-on, but I'm not pressing — we're extended, so this is a build-on-weakness game, not a chase. I used today's dip to add back $CAT and $BE into names holding their rising 21dma-structure, and trimmed a slice of $NVDA to derisk a runner. The board's clean: new highs, breadth reclaiming, internals unanimous, leaders holding.
+What I need now is momentum to follow through. The make-or-break pillar is breadth — the MCO hooked up and Summation just reclaimed its 10dma, and I want to see that convert into real momentum and leader breadth (still flat, digesting) over the next few sessions. That's the green light that derisks my new adds. If the adds work, I derisk and roll into bigger cores; if they don't, I'm already positioned to reduce exposure and get defensive. We're not there yet — so I stay patient and let it prove itself.
+Giveback days are part of riding a trend — even if we get more weakness here, I'm not pushing past 140% on margin. That's my line. Defense kicks in if breadth rolls back over (MCO fails, Summation loses the 10dma) or the new adds stop working — then I tighten up and let the dust settle. Until then it's simple: hopefully the Qs carry into another all-time high, I derisk the adds, and I'm sitting in bigger cores in the best merchandise. Patient, engaged, not forcing it.
+
+## TOP IDEAS FOCUS LIST
+Risk-on board but extended — I'm not chasing, so these are the names I want reloading back into rising 21dma-structure, where my entries are lowest-risk:
+$BE (20) — Hydrogen / Electrical Equipment
+$DOCN (92) — GPU Cloud & HPC / Software Infrastructure
+$NVT (290) — Grid Infrastructure / Electrical Equipment
+$KLAC (460) — Semiconductor Equipment
+$TWLO (630) — DevOps & CI/CD / Software Infrastructure
+$OSCR (892) — Healthcare Plans
+$VRT (920) — AI Infrastructure / Electrical Equipment
+$AUR (1043) — Autonomous / IT Services
+
+=== 2026-05-29T01:25 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-528?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/28 — Evening Market Update & Strategic Insights]
+
+=== 2026-06-01T01:39 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS 05/29
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on**
+- Uptrend, riding above a rising 21dma-structure, fresh ATH into Friday's close — trend posture is clean.
+- Stretched above the 21dma-structure after the run off the April lows, but this week was digestion, not a vertical push. Mixed-bar character up here reads as normal rest, not a top tell yet.
+
+**2. Breadth Regime — risk-on**
+- MCSI flat above its 10dma with breadth still expanding underneath — participation's holding.
+- MCO/MCSI not overbought, so there's still room. No bearish divergence against the new highs.
+
+**3. Internals — risk-on**
+- Credit spreads (SHY/HYG) below a declining 21dma-structure and VIX below a declining 21dma-structure — both pointing risk-on, nothing flashing.
+- XLK/XLP above a rising 21dma-structure — tech still leading staples, risk appetite intact.
+
+**4. Liquid Leaders Action — risk-on**
+- Leaders holding above rising 21dma-structure; healthy internal rotation as software stepped up while the recent AI/semis names took a day to rest. Setups clustering at support — Foundry ($TSEM, $INTC), Electronics Mfg ($TTMI, $JBL), optics/photonics.
+- Leaders coiling at structure rather than extended — that's the constructive look. No red flags.
+
+**5. Portfolio & NER Feedback — risk-on**
+- NER at -1.15% (new-exposure risk open on last week's adds), Open Heat -17.24%. Locked 1/3 of $GLW at 2R off its rising 21dma-structure and added to $BE — the tape's paying the right-side entries and leaders are holding. The book's leaning in with the YTD cushion behind it.
+
+## THE GAMEPLAN
+
+**Trend's intact and I've already done my buying.** I leaned into last week's weakness and raised exposure on the dips into rising 21dma-structure — so up here, I'm not pushing the book further. All five pillars are risk-on, but $QQQ is stretched and the week's been digestion, which means my job now is to **trim into strength, not chase it.** If momentum comes back and the newer stuff extends, those pops are my exits — let the tape hand me the trims.
+
+That ties straight to the **$ARM note: I'll look to trim some into any MSFT-news pop at the open** — if it gives me the extension, I take it rather than holding for the last dollar. Same logic across the book: manage what's working, bank strength on the extended names, and let fresh ideas come to me on pullbacks into structure instead of initiating up here.
+
+The pillar I'm watching most is **breadth (MCSI/MCO)** — flat above the 10dma, expanding but not roaring. As long as it keeps participation up while price digests, the rest resolves higher and I stay engaged. **If MCSI rolls under its 10dma while $QQQ sits extended at the highs, that's the divergence that flips me** — that's when I tighten stops on the extended names and wait. Internals would have to break for me to go properly defensive; until then this is digestion, not distribution, and giveback days up here are just part of riding the trend.
+
+## TOP IDEAS FOCUS LIST
+
+These are my names — I want them on pullbacks into rising 21dma-structure, not chased into extension. Structure-buys come to me.
+
+- **$BE** (16) — Electrical Equipment / Hydrogen
+- **$INTC** (101) — Semiconductors / Foundry
+- **$NVT** (236) — Electrical Equipment
+- **$COHR** (238) — Hardware & Equipment / Optical
+- **$TWLO** (444) — Software / Infrastructure
+- **$GLW** (474) — Hardware & Equipment / Optics
+- **$OSCR** (929) — Healthcare Plans
+- **$NVDA** (1083) — Semiconductors / AI Infrastructure
+
+=== 2026-06-01T01:39 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-531?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 5/31 — Evening Market Update & Strategic Insights]
+
+=== 2026-06-02T00:49 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [6/1]
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on (extended)**
+- Price above rising **21dma-structure** — the one thing I know for sure. Don't overthink it.
+- Extended though: **3.3x ATR off the 21ema, ~8x off the 10wma.** Information, not a signal — but it shapes how I size and where I take.
+
+**2. Breadth Regime — risk-on**
+- MCSI back in expansion above its 10dma, MCO reclaimed its uptrend.
+- Breadth expanding underneath price, and we're still not overbought.
+
+**3. Internals — risk-on**
+- Credit spreads spiked a touch today but remain in a downtrend below their declining **21dma-structure**. VIX same posture.
+- XLK/XLP ratio still in a solid uptrend — tech is leading. 3 on 3.
+
+**4. Liquid Leaders Action — mixed**
+- Software very strong; semis, photonics, optics a split bag — some strong, some weak under the surface.
+- No structural cracks or red flags yet — leaders still acting right, just messy rotation underneath.
+
+**5. Portfolio & NER Feedback — risk-on (managed)**
+- Trimmed ARM, NBIS, INTC, BE, CAT into strength; cut GLW (closed below structure). Rotated into INTC and took a third off at 2R.
+- **NER 0%, Open Heat -17.4%** — exposure pulled down to sleep level. Tape paid me; I paid myself back.
+
+## THE GAMEPLAN
+
+**Opportunity until proven otherwise, but I'm not pressing.** Four pillars clean risk-on, leadership mixed under the surface — that's enough to stay engaged, but $QQQ at 3.3x ATR off the 21ema and ~8x off the 10wma means I respect the extension. Today was about pulling margin down into climactic-feeling moves in software, ARM, NBIS, NVDA, MU — whether that was THE top or just A top, I have no clue. Doesn't matter. Trimming into extensions, raising stops, removing what's not working — that's how I don't hand back the gains.
+
+**Leadership is the make-or-break pillar.** Software's carrying the flag while semis, photonics, optics split. If the strong groups crack or the laggards fail to firm up, the mixed read tips risk-off underneath even while the index holds structure. That's the spot I'm watching most over the next few sessions.
+
+**Posture from here: riding the trend until red flags show.** New ideas come to me on pullbacks into rising **21dma-structure** — I'm not chasing extension. Defense kicks in if internals flip (credit spreads/VIX reclaim their 21dma-structure), MCSI/MCO roll under their 10dmas, or leadership starts breaking structure in size. Until then, cores stay, NER stays light, and I let structure do the work.
+
+## TOP IDEAS FOCUS LIST
+
+These are the names I'm watching for setups on pullbacks into rising **21dma-structure** — no chasing extension here.
+
+- **$BE** (18) — Industrials / Electrical Equipment & Parts
+- **$AEHR** (102) — Technology / Semiconductors
+- **$TSEM** (127) — Technology / Semiconductors
+- **$TER** (162) — Technology / Semiconductors
+- **$INTC** (194) — Technology / Semiconductors
+- **$COHR** (224) — Technology / Hardware, Equipment & Parts
+- **$CGNX** (665) — Technology / Hardware, Equipment & Parts
+- **$EBAY** (1079) — Consumer Cyclical / Specialty Retail
+
+=== 2026-06-02T00:50 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-61?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 6/1 — Evening Market Update & Strategic Insights]
+
+=== 2026-06-03T01:37 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS 6/2
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on (extended)**
+- Tape still in an uptrend above a rising **21dma-structure**. $QQQE more than 4 ATRs from the 21ema and ~7 ATRs from the 10wma — that's information, not a signal.
+- $QQQ closing at 746 with daily ATR%: 1.35. Character is digestion-then-push, not exhaustion.
+
+**2. Breadth Regime — mixed**
+- MCSI flat and starting to show negative divergence vs. price — not picking up with the strong action.
+- MCO hooking down today. Holding above its 10dma but losing slope — this is the pillar I'm watching.
+
+**3. Internals — risk-on**
+- Credit Spreads (SHY/HYG) compressing and VIX at 15.77 trending below 21dma-structure — both risk-on.
+- BTC the one drag, but three-on-three internals still risk-on read.
+
+**4. Liquid Leaders Action — risk-on**
+- Semis sweeping the top of the RS board — Memory, Foundry, Analog, Equipment, Power Semis all stacked. Photonics/opticals reclaimed leadership today with real inflow on a flat-breadth tape — that's the tell.
+- Setups clustering at rising 21dma-structure across the leadership board. Rotation, not exhaustion.
+
+**5. Portfolio & NER Feedback — risk-on**
+- NER -0.65%, Open Heat -19.71%. Small NER open, comfortable carrying overnight.
+- Adds today ($TSLA, $BE) both off rising 21dma-structure with risk defined — book is being paid for taking known-risk spots, not chasing.
+
+## THE GAMEPLAN
+
+**Opportunity until proven otherwise, but I'm respecting the extension.** Normally I'd want pullbacks to 21dma-structure and won't trade extended/non-oversold tape — but this market isn't giving that, and hasn't been since the turn. You can't sit out waiting for a pullback that doesn't come. You play the hand you're dealt, find the leader groups setting up, and take clean R/R when it shows up — that's what $TSLA and $BE were today.
+
+The **make-or-break pillar is breadth** — specifically MCO holding above its 10dma and MCSI repairing that flat-to-divergent profile. As long as liquid leaders keep reclaiming and rotating (photonics today is the cleanest example), the read stays constructive even with breadth dragging. Internals three-on-three, leaders doing the work — that's the anchor.
+
+Posture for the next few sessions: stay engaged but selective. **Top merchandise at known-risk spots only — no chasing extension.** Trim into strength where things are stretched on my book, let the core run as long as names hold above their rising 21dma-structure. Defense kicks in if MCO rolls below its 10dma *and* leaders start failing at structure together — that's the regime flip. Until then, I let the trend pay me.
+
+## TOP IDEAS FOCUS LIST
+
+These are the names I'm focused on at or near rising 21dma-structure — where risk is defined and the R/R earns the entry in an extended tape.
+
+- **$MXL** (245) — Semiconductors
+- **$INTC** (263) — Semiconductors
+- **$RKLB** (313) — Aerospace & Defense
+- **$BKSY** (672) — Hardware, Equipment & Parts
+- **$Q** (747) — Semiconductors
+- **$EBAY** (1403) — Specialty Retail
+
+=== 2026-06-03T01:39 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-62?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 6/2 — Evening Market Update & Strategic Insights]
+
+=== 2026-06-04T01:04 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS 6/3
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on**
+- Uptrend intact, holding above rising 21dma-structure (744.21 close vs. 709 21ema). ATR Dist. 21ema at 2.94 — extended but not stretched, normal digestion territory.
+- Today's bar is a controlled give-back into the run. Character is digestion, not distribution.
+
+**2. Breadth Regime — neutral**
+- MCSI sitting just above its 10dma, drifting sideways at 0.09. Not breaking, not impulsing.
+- MCO at -0.42 — softening under zero. Breadth losing some thrust as price digests, which fits the tape.
+
+**3. Internals — risk-on**
+- Credit Spreads (SHY/HYG) rejected right at the declining 21dma-structure and previous swing low — closed weak. VIX same story, capped under structure at 16.05. Both confirming.
+
+**4. Liquid Leaders Action — risk-on**
+- Semis & Hardware carrying the tape — Memory (RS 97), Power Semis (91), Foundry (89), AI Infra (88) all stacked. Connectivity is the cleanest breadth setup with the full leadership board coiling at 21dma-structure together.
+- $NVDA and $TSLA both developing higher lows into rising 21dma-structure — that's the tell. AVGO earnings down 12-13% AH is the wrinkle to watch on the gap.
+
+**5. Portfolio & NER Feedback — risk-on**
+- NER -1.02%, Open Heat -16.21%. Adds on TSLA top-off and NVDA structure backtest were the right side of the pullback. Book is heavy and working.
+
+## THE GAMEPLAN
+
+**Constructive digestion, and I'm leaning into it — but not pushing.** The pillars line up risk-on with breadth as the soft spot, and that matches what I'm feeling: the tape isn't tired, it's resting. Leaders backing into structure, internals rejecting under their own 21dma-structure, my best merchandise (NVDA, TSLA) developing higher lows right where they're supposed to. That's the read.
+
+**The make-or-break pillar here is breadth.** MCSI is hugging its 10dma and MCO has rolled under zero — if MCSI loses the 10dma while QQQ continues to digest, that's the regime-flip signal and I'd start tightening on extended names. Until then, soft breadth inside a risk-on tape is normal cooling.
+
+I'm already loaded up — NER near max tolerance, Open Heat working. **My posture is patience first, structure second.** Not looking to push NER past 1% unless NVDA, TSLA, or BE give me real follow-through on the AVGO gap. If buyers step in and grab the open, that's the cleanest tell and I'd look to add to existing core names like $APLD and $INTC on 21dma-structure backtests — not chase, not initiate fresh risk. If the gap doesn't get bought, structure tells me what to do and I sit on my hands. **Giveback day, and that's part of riding the trend.**
+
+## TOP IDEAS FOCUS LIST
+Where I focus when the tape is digesting — names sitting at or backing into rising 21dma-structure, sorted by RS Rank.
+
+- **$RKLB** (422) — Aerospace & Defense / Space Infrastructure
+- **$CRDO** (624) — Connectivity Semiconductors
+- **$INTC** (164) — Semiconductors
+- **$APLD** (321) — Information Technology Services / GPU Cloud & HPC
+
+=== 2026-06-04T01:09 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-63?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 6/3 — Evening Market Update & Strategic Insights]
+
+=== 2026-06-05T00:52 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS 6/4
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on**
+- Still sitting comfortably above the rising 21dma-structure, holding trend posture through an AVGO-driven gap down in tech.
+- Character of the day was the tell — names gapped into structure, got bought, reversed to close green. Constructive, but futures showing overnight pressure again.
+
+**2. Breadth Regime — neutral (constructive lean)**
+- MCSI flat around neutral at 0.08 — room either side, market wants to swing. No regime commitment yet.
+- MCO hooked up today from -0.08, GDB of 12. Flat breadth with an upside hook — constructive on the margin, needs follow-through to mean anything.
+
+**3. Internals — risk-on (fragile)**
+- Credit Spreads rejected their declining 21dma-structure with a downside reversal.
+- VIX did the same. Both lined up risk-on — but a reclaim of structure on either flips this pillar in a hurry.
+
+**4. Liquid Leaders Action — risk-on**
+- Leaders were the anchor today — held up well and gave traction across the book when the tape got sloppy.
+- Follow-through question is tomorrow: if leaders can't carry today's action and break two-day lows, that's a reverse expectation breaker confirming.
+
+**5. Portfolio & NER Feedback — risk-on**
+- Constructive digestion day — oops reversals off structure across the book, leaders doing the work.
+- Action: NEW none / ADDED INTC, APLD / TRIMMED none / CLOSED none
+- NER -1.50% (small NE risk open from today's adds), Open Heat -16.30%, sitting at 172.5% exposure — about as high as I sustain.
+
+## THE GAMEPLAN
+
+**Today was the constructive day — tomorrow is the confirmation day.** Leaders closed strong, internals reversed risk-on, MCO hooked up off the lows, oops reversals across the book. All the right boxes got checked. But futures are showing overnight pressure again, and as much as I like today's action, if it can't carry over and follow through tomorrow, this becomes a completely different game.
+
+**The make-or-break pillar is leaders working in tandem with breadth — can they hold today's lows while MCO keeps its hook?** MCSI flat at neutral means the market has room either way and is going to swing — the next two sessions decide which side. If leaders break two-day lows, MCO rolls back over, and internals reclaim their 21dma-structure to the upside, that's a reverse expectation breaker confirming and the regime flips. In that case I cut new exposure back to core and shift into defense — not because the trend is broken, but because at 172.5% I can't afford to wait around for it to be obvious.
+
+Tomorrow's posture: super patient with the adds (INTC, APLD) — let them prove the adds were right. But quick to cut if follow-through fails, just because of how much exposure I'm carrying. If today's action holds and leaders push, I use any momo to chill exposure into the weekend.
+
+## TOP IDEAS FOCUS LIST
+
+Focusing on names sitting at or pulling into rising 21dma-structure — that's where I want my entries, not chasing extension.
+
+- **$BE** (17) — Industrials / Electrical Equipment
+- **$TSEM** (82) — Technology / Semiconductors
+- **$INTC** (187) — Technology / Semiconductors
+- **$RKLB** (385) — Industrials / Aerospace & Defense
+- **$APLD** (400) — Technology / Information Technology Services
+- **$ASTS** (541) — Technology / Communication Equipment
+- **$Q** (856) — Technology / Semiconductors
+- **$IONQ** (1053) — Technology / Computer Hardware
+
+=== 2026-06-05T00:56 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-64?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 6/4 — Evening Market Update & Strategic Insights]
+
+=== 2026-06-08T01:55 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS [6/8]
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-off**
+- Sliced through rising 21dma-structure in a single session, -4.80% / -3 ATR day, closed 705.06 below a now-flattening 21ema (710.65). Negative divergence in breadth played out.
+- ATR Dist. 21ema -0.94, ATR Dist. 10wma +2.41 — the cushion is gone in one bar. Character of the day was a tail event off all-time highs, not orderly digestion.
+
+**2. Breadth Regime — risk-off**
+- MCSI rolled below its 10-day MA, breadth contraction regime confirmed.
+- MCO at -0.85, trending lower — the negative divergence I was watching resolved hard.
+
+**3. Internals — risk-off**
+- Credit Spreads (SHY/HYG) spiked above 21dma-structure into the high of the range — first real stress signal in weeks.
+- VIX +39.70% to 21.50, one of the biggest single-day moves ever, blew above 21dma-structure. Both internals flipped in a single session.
+
+**4. Liquid Leaders Action — risk-off**
+- A lot of names broke down through their 21dma-structure on 2–3 ATR moves. The damage was broad, not isolated.
+- The ones still sitting at structure are doing so after extension moves — fragile, not constructive. Respect the breakdown.
+
+**5. Portfolio & NER Feedback — risk-off**
+- Stress-test day that turned into a full risk-off flip. Fastest trip from margin to flat I can remember.
+- Action: NEW none / ADDED none / TRIMMED none / CLOSED INTC, NVDA, APLD, TSLA, BE, COHR, MU, ARM, CAT, NBIS
+- NER 0%, Open Heat 0%, Open Delta flat. No overnight risk. Defense is the job from here.
+
+## THE GAMEPLAN
+
+**Defensive posture, cash is a position.** Friday wasn't a giveback — it was a regime flip in a single session, and I didn't see a -5% Nasdaq day with 2–3 ATR moves in the leaders coming off new highs. Middle East redeveloping over the weekend may be the catalyst, may just be the excuse — doesn't matter. The tape didn't ask, it told. All five pillars flipped risk-off inside one day, and I'm respecting that.
+
+The **make-or-break pillar from here is $QQQ's behavior on the retest of 21dma-structure**. Just like in an uptrend I wait for pullbacks into rising structure, in a downtrend I want to see how price reacts on the retest of a now-declining 21dma-structure. That reaction tells me everything — failure there confirms the regime, reclaim opens the door to reassess. Below a declining 21dma-structure, the market can do whatever it wants. My job is to watch, not participate.
+
+No new initiations. **I'm sitting on hands, gathering information, waiting for volatility to subside and good entries to form before re-engaging.** Patience is the edge here. I had an incredible run off the April lows and protecting that EC is non-negotiable. The book is flat — there's no decision to make on existing exposure, only on whether to add it back, and the answer right now is no.
+
+## TOP IDEAS FOCUS LIST
+
+No Focus List tomorrow. Below a declining 21dma-structure with internals and breadth confirming, I want to see how the next few sessions develop before flagging anything. When the tape sets up again, the names will be there.
+
+=== 2026-06-08T01:56 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-67?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 6/7 — Evening Market Update & Strategic Insights]
+
+=== 2026-06-09T01:29 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS 6/8
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — neutral**
+- $QQQE absorbing Friday's selling, holding 21dma-structure with the gap-up. Didn't see much follow-through to the upside either — sideways action, not resolution.
+- Weekly trend still intact. Character is digestion, not damage — but the one-day shakeout vs. start-of-something thesis isn't resolved yet.
+
+**2. Breadth Regime — mixed**
+- MCSI rolled below its 10dma on QQQE — short-term breath extension getting oversold. Watching for the hook back up.
+- MCO oversold and hooking up on Liquid Leaders side, MCSI still ▼ but the LL composite is short-term washed — the setup for a bounce is here, just needs follow-through.
+
+**3. Internals — risk-on**
+- Credit Spreads (SHY/HYG) confirming the backtest — no spike, no follow-through, holding 21dma-structure cleanly. That's the tell.
+- VIX spiked Friday but already mean-reverting — back at 18.93, no sustained fear bid.
+
+**4. Liquid Leaders Action — risk-on (extended near-term)**
+- Semis running the tape — Memory, Power Semis, Equipment, Foundry all coiling broadly at 21dma-structure. Group leadership, not single-name.
+- AI Servers (DELL, ANET) and Connectivity (CRDO) the cleanest non-semi rotations. LL composite hooked up Friday — short-term oversold and starting to lift.
+
+**5. Portfolio & NER Feedback — risk-on (probing)**
+- Constructive correction day — used the open weakness to reopen the cores I shouldn't have closed Friday, then added new exposure on screaming RS into the close.
+- Action: NEW $CORZ / $LITE / $INTC — ADDED $ARM, $COHR, $NBIS (cores reopened) — TRIMMED none — CLOSED none
+- NER 1.25%, Open Heat 6.51%. Small new risk open to test the one-day shakeout thesis. Feedback-driven from here.
+
+## THE GAMEPLAN
+
+**The whole setup from here is feedback-driven.** Friday was either a one-day shakeout or the start of something bigger — I don't know yet, and pretending to know is how you blow up the book. What I do know is the structure is still intact, internals are confirming, and the LLs are short-term oversold with MCO hooking up. That's a setup, not a thesis.
+
+The **make-or-break read tomorrow is the new positions** — $INTC, $CORZ, $LITE. If they gain traction and I can derisk into the target, I'll push NER higher and lean back into progressive exposure. If they stall or roll, that's the tell — I trim, wait, and let the market set up further down the road. Not pushing margin, just gauging traction.
+
+Posture is **trust the structure, use progressive exposure**. Defense kicks in if the new exposure can't hold its risk, or if MCO rolls back over before MCSI confirms a turn. Until then, I'm playing the hand I'm dealt — small risk on, ready to scale either direction depending on feedback.
+
+## TOP IDEAS FOCUS LIST
+
+These are the names I'm watching at or pulling into rising 21dma-structure — where my new exposure lives.
+
+- **$BE** (18) — Industrials / Electrical Equipment
+- **$DOCN** (43) — Software Infrastructure
+- **$TTMI** (83) — Hardware Equipment
+- **$AMD** (117) — Semiconductors
+- **$INTC** (134) — Semiconductors
+- **$VIAV** (240) — Communication Equipment
+- **$NVT** (527) — Electrical Equipment
+- **$RKLB** (530) — Aerospace & Defense
+- **$GFS** (903) — Semiconductors
+- **$CRWD** (920) — Software Infrastructure
+- **$IONQ** (987) — Computer Hardware
+- **$ANET** (998) — Computer Hardware
+
+=== 2026-06-09T01:31 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-68?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 6/8 — Evening Market Update & Strategic Insights]
+
+=== 2026-06-10T01:24 ===
+# SITUATIONAL AWARENESS, GAMEPLAN, and TOP IDEAS 6/9
+
+## THE MARKET PICTURE (5-pillars checklist)
+
+**1. $QQQ Price Action — risk-on (fragile)**
+- QQQ reclaimed above Friday's low and back above 21dma-structure on QQQE — double reclaim setup, U&R potential confirming
+- Today's low is the line in the sand. Bar character was capitulation-then-reclaim — constructive, but needs vol to calm before I trust it
+
+**2. Breadth Regime — neutral / setting up**
+- MCO oversold with QQQE holding 21dma-structure — that's the exact setup I want when the tape gets ugly
+- LLs same story: holding 21dma-structure with MCO & breadth ext. oversold. Follow-through is the tell
+
+**3. Internals — mixed**
+- Credit Spreads spiked and got rejected, closing below yesterday's high — not giving the big risk-off signal despite the volatility. That's a tell
+- VIX same story — spike & reject. Internals are saying the dust might be settling faster than price suggests
+
+**4. Liquid Leaders Action — risk-on**
+- ARM, NBIS, COHR, AMD all confirming the reclaim — liquid leaders are the merchandise showing relative strength here
+- Semis own the leadership board: Memory, Power, Analog, and Equipment all coiling at 21dma-structure with broad constituent participation. Transition phase, but the rotation's intact
+
+**5. Portfolio & NER Feedback — neutral**
+- Stress-test day that turned constructive into the close
+- Action: NEW: $CRWD, $AMD / ADDED: none / TRIMMED: $AMD (1/3 at 2R into the close) / CLOSED: $GFS, $LITE
+- NER -1.52%, NE Delta -1.62%, Open Heat -4.21%. Small NE Risk open on the new entries — exposure belongs in this transition phase, but only because 90% of positions closed back in structure and most above Friday's low
+
+## THE GAMEPLAN
+
+**Make-or-break day.** Today's lows on the shakeout and the U&R need to hold — that's the line in the sand. If QQQ, QQQE, the liquid leaders, or my book start breaking today's low, that's a cash event and I'll be closing exposure fast. CPI prints tomorrow morning, which makes this even more binary.
+
+But I'm going in with an optimistic mind first. The setup is there: shakeout, undercut & rally, oversold signal still live on the LLs, 90% of positions reclaiming structure, internals rejecting the risk-off signal. **That's the merchandise showing up when the tape gets ugly** — exactly the texture I want to see.
+
+The make-or-break pillar is **$QQQ Price Action holding today's low.** If that holds and breadth follows through, I'm engaged and looking at the Focus List for structure-buys on any orderly pullback. If today's low breaks — especially on a CPI gap-down that can't reclaim — I'm reducing fast, no stress, no ego. Cushion on cycle is the only reason I'm carrying anything overnight. Open-minded both ways.
+
+## TOP IDEAS FOCUS LIST
+Below today's low it doesn't matter — but if we follow through on the U&R, these are the names sitting at or above rising 21dma-structure that I want to see set up cleanest:
+
+- **$BE** (19) — Industrials / Electrical Equipment
+- **$DOCN** (54) — Software Infrastructure
+- **$TTMI** (172) — Hardware / Electronics Mfg
+- **$INTC** (202) — Semiconductors
+- **$AMD** (224) — Semiconductors / AI Infrastructure
+- **$NBIS** (361) — GPU Cloud & HPC
+- **$NVT** (644) — Electrical Equipment
+- **$POWI** (1031) — Power Semiconductors
+- **$ZETA** (1114) — Software Application
+- **$GFS** (1185) — Semiconductors
+- **$CRWD** (1211) — Software Infrastructure
+- **$ANET** (1249) — Computer Hardware
+
+=== 2026-06-10T01:26 ===
+https://open.substack.com/pub/primetrading/p/the-prime-report-69?r=mst4k&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true  [link: The Prime Report - 6/9 — Evening Market Update & Strategic Insights]
+
