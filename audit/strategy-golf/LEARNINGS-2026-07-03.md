@@ -1,4 +1,4 @@
-# Strategy Golf — consolidated learnings, 2026-07-03 (updated 07-05)
+# Strategy Golf — consolidated learnings, 2026-07-03 (updated 07-06)
 
 One day, one thread: Elvis Sun's loss-function-development (LFD) playbook → a
 blinded self-correction harness → an autonomous Fable 5 optimization run → four
@@ -67,6 +67,29 @@ Everything below is empirical; scripts and raw results live in this directory.
 - **Soft votes beat hard vetoes when the data says so:** score-≥2 calls WITHOUT
   the regime flag outperformed in both splits (n=15 total — rare double
   idiosyncratic confirmation). Check before promoting any filter to a gate.
+- **Ground truth = the counterparty's STATED numbers** (his pf-update posts:
+  2024 +66.5%, 2025 +90.2%, 2026-May +26.8%). Reconstructions from message
+  fragments systematically mislead (mine ran 12–38 points low by omitting
+  trims and open positions) and must always be labeled with the diff shown.
+  Two trust-breaking incidents (SOLT phantom, the +15.1% table cell) produced
+  the standing rules: no number in a comparison cell unless it measures the
+  same quantity; bias in the cell, not a footnote; every parameter in a build
+  carries provenance (his words / tested / my convention, flagged).
+- **Event triggers beat price triggers for adds.** Continuation curve: only
+  37% of probes reaching +2 ATR reach +6; 47% from +3. Price-level adds at
+  +2 ATR won the trend year but lost the choppy year; adds triggered by HIS
+  next call (his read, incl. pullback timing) were the only variant positive
+  in both years. ATR earns its keep on stops, not on add timing.
+- **Entry-confidence sizing mostly fails:** the confluence buckets that
+  ranked the all-calls book do NOT stably rank probe outcomes (mid bucket
+  flips sign between years; high bucket n=4–6). The single exception, again:
+  winner-continuation — $5k probes on it improved BOTH years (+$0.4k/+$3.1k)
+  for ~$300/yr extra FX. His posted size stays a NEGATIVE signal — never
+  anchor sizing to it.
+- **The first-leg cost is structural:** he enters at 11% of account on day
+  one; a probe design rides the first leg (entry → his first add, median
+  +3.2 ATR) at a quarter of his size. Catch-up sizing can narrow but never
+  close this — it is the price of FX-cheap probes.
 
 ## 3 · Trading findings (Alex's edge, 611 calls Nov-24..Jul-26)
 
@@ -130,7 +153,29 @@ Everything below is empirical; scripts and raw results live in this directory.
   Note: X read RISK on 2025-03-10 and 2026-02-20 (both Q1 bleed windows) and
   reads RISK (credit+defensive) as of 2026-07-03 — the live jury is out.
 
-## 5 · The pre-registered live experiment (2026H2 grades it)
+## 5 · THE BOOK — final live design (v2, 2026-07-06, `mini-harness/one_book.py`)
+
+Provenance: M = Michael's words, T = tested choice he approved, C = flagged convention.
+
+| Rule | Value | Prov. |
+|---|---|---|
+| Qualify | 2 Alex calls in 90d, or 1 call if core within 18mo (A18) | T |
+| Probe | $2,500 at qualifying day's close; **$5,000 if winner-continuation** (his last stated Closed in the name ≤30d was a profit) | M / T |
+| Adds | triggered by HIS next call while position in profit; catch-up to **$11k → $19k → $28k** (his measured avg first position 11.2% / p75 single 19% / median full build 28%); his add while we're losing: ignored | M |
+| Stops/exit | 3×ATR trail below highest close → 2×ATR beyond +6 ATR gain → 1.5× beyond +12 [C]; halved in weak regime; single close exits all; no trims | T / M |
+| Sleeve | $100k; when full, **only winner-continuation probes** may open; adds always allowed | M |
+| Guards | split-freeze on 40% overnight jumps; entries priced from bars (split-immune) | T |
+| Cadence | EOD 21:35 UK; his Trimmed/Closed posts captured live for the WC flag | — |
+
+Backtest reference (stamped, unconstrained sleeve, SIPP costs): 2025 ≈ +$39k,
+2026 ≈ +$7.4k, on peak deployment ~$238k. Alex stated benchmark: +90.2% /
++26.8%-May — the gap is his 4–6× exposure and leverage, not the rules.
+Superseded on the way here: price-ladder adds, the 2× uniform dial, RS-tier
+probes (2025-only benefit), fixed-ATR catch-up rungs (+9 ATR "ridiculous").
+Still open (flagged defaults): regime gate on adds, re-arm, exits at size,
+entry convention (paper=close, live fill=next open).
+
+## 6 · The pre-registered live experiment (2026H2 grades it)
 
 Frozen as of 2026-07-05 — no further tuning against 2026H1 data:
 confluence score (equal weights, WC uncapped-judged) · tiers skip/HALF/FULL ·
