@@ -4,8 +4,8 @@
 Rules (frozen; backtested as A18/E0 in tradeoff_sweep.py):
   qualify   2 Alex calls within 90 days, OR one call if the ticker was a core
             name within the last 18 months (A18)
-  entry     $2,500 at the qualifying day's CLOSE (bars, not posted prices)
-  adds      +$2,500 when close is 3*ATR, then 6*ATR above basis (entry-day ATR)
+  entry     $5,000 at the qualifying day's CLOSE (2x dial) (bars, not posted prices)
+  adds      +$5,000 when close is 3*ATR, then 6*ATR above basis (entry-day ATR)
   trail     3*ATR(14) below highest close; tightens to 2*ATR beyond +6 ATR of
             gain, 1.5*ATR beyond +12; halves while market state is below
             CONFIRMED/EARLY; exit ALL on a single close below the trail
@@ -13,7 +13,7 @@ Rules (frozen; backtested as A18/E0 in tradeoff_sweep.py):
   no trims  no partial exits of any kind
   guards    split/rebase freeze: >40% overnight close jump freezes the
             position for manual review instead of auto-selling
-  sleeve    $100,000 paper, ~13 names max at full build ($7,500/name)
+  sleeve    $100,000 paper, ~6-7 names max at full build ($15,000/name)
 
 State: ~/mission-control/alex-forward-test/one_book.json
 Alerts to stdout: BUY / ADD / SELL. EOD cadence (entries are at-close prices;
@@ -32,7 +32,7 @@ REGIME = os.path.join(STATE_DIR, "regime_states.json")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import engine
 
-SLICE = 2500
+SLICE = 5000                                  # dial 2x (Michael, 2026-07-05); was 2500
 CORE_WINDOW, RETURN_WINDOW = 90, 540          # days: 2-in-90d, A18 = 18 months
 
 def days(a, b): return (datetime.strptime(b, "%Y-%m-%d") - datetime.strptime(a, "%Y-%m-%d")).days
