@@ -52,7 +52,7 @@ def market_picture():
         else:
             cls = "up" if ok else "down"
             parts.append(f"internals (VIX/credit/defensive) <b class='{cls}'>"
-                         f"{'clear' if ok else 'RISK'}</b>" + (f" ({detail})" if detail != "clear" else ""))
+                         f"{'risk on' if ok else 'risk off'}</b>" + ("" if ok else f" ({detail})"))
     except Exception:
         pass
     return ('<h2>Market picture</h2><div class="card"><div class="sub">'
