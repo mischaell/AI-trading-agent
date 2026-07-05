@@ -93,7 +93,8 @@ def main():
         for p in sorted(closed, key=lambda x: x.get("closed",""), reverse=True)[:30])
     events = "".join(f"<li><span class='sub'>{html.escape(e)}</span></li>"
                      for e in reversed(st.get("events", [])[-40:]))
-    body = f"""<!-- generated {datetime.now().strftime('%Y-%m-%d %H:%M')} -->
+    body = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<!-- generated {datetime.now().strftime('%Y-%m-%d %H:%M')} -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>THE BOOK</title>
 <style>
@@ -116,6 +117,7 @@ table {{ width:100%; border-collapse:collapse; font-size:14px; }} td {{ padding:
 ul {{ padding-left:0; list-style:none; margin:0; }} li {{ padding:5px 0; border-bottom:1px solid var(--bd); }}
 footer {{ color:var(--mut); font-size:12px; margin:22px 0 8px; }}
 </style>
+</head><body>
 <h1>THE BOOK — paper journal</h1>
 {market_picture()}
 <div class="summary">
@@ -132,6 +134,7 @@ footer {{ color:var(--mut); font-size:12px; margin:22px 0 8px; }}
 <ul>{events if events else '<li class="sub">none yet</li>'}</ul>
 <footer>rules: $2.5k probe ($5k on winner-continuation) · adds on his calls in profit → $11k/$19k/$28k · 3×ATR trail, tightens with gain, halves in weak regime · sleeve full ⇒ WC entries only<br>
 generated {datetime.now().strftime('%Y-%m-%d %H:%M')} · paper only</footer>
+</body></html>
 """
     os.makedirs(OUT_DIR, exist_ok=True)
     open(os.path.join(OUT_DIR, "index.html"), "w").write(body)
