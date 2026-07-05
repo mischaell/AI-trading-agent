@@ -166,6 +166,10 @@ def refresh_regime():
         states[d] = st
     json.dump(states, open(REGIME_OUT, "w"))
     last = sorted(states)[-1]
+    li = bidx[last]
+    json.dump(dict(date=last, state=states[last], mco_z=round(mco_z[li], 2),
+                   mcsi_z=round(mcsi_z[li], 2)),
+              open(os.path.join(STATE_DIR, "regime_detail.json"), "w"))
     print(f"regime: {len(states)} daily states -> regime_states.json (latest {last}: {states[last]})")
 
 if __name__ == "__main__":

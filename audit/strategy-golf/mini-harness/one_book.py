@@ -200,6 +200,11 @@ def main():
     deployed = sum(sum(s * px for s, px in p["lots"]) for p in openp)
     print(f"one_book: {len(openp)} open (${deployed:,.0f} deployed at cost), "
           f"{st['closed']} closed ({st['wins']} wins), realized ${st['realized']:+,.0f}")
+    if alerts:
+        from datetime import date as _date
+        st.setdefault("events", [])
+        st["events"] += [f"{_date.today().isoformat()}  {a}" for a in alerts]
+        st["events"] = st["events"][-300:]
     save(st)
     for a in alerts: print(a)
 

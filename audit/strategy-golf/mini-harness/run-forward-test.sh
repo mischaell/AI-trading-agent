@@ -23,6 +23,7 @@ python3 "$CODE/refresh_data.py" >>"$LOG" 2>&1 || echo "[$(ts)] refresh error" >>
 
 # 1c) THE BOOK (one_book): qualification + entries at close + daily advance
 BOOK="$(python3 "$CODE/one_book.py" --run 2>>"$LOG" || true)"
+python3 "$CODE/journal_gen.py" >>"$LOG" 2>&1 || true
 BOOK2=""
 printf '%s\n' "$BOOK" >>"$LOG"
 
