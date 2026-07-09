@@ -36,7 +36,8 @@ $BOOK2"
 echo "$OUT" >>"$LOG"
 
 # 3) Telegram. Always send the scorecard head; signals/trims/exits if present.
-SIGNALS="$(printf '%s\n' "$OUT" | grep -E '^([A-Z]+ \| (FULL|HALF|DEMOTED)|BUY |ADD |TRIM |SELL |EXIT)' || true)"
+# tier lines (FULL/HALF/DEMOTED) are LOG-ONLY since 2026-07-09; legacy TRIM/EXIT too
+SIGNALS="$(printf '%s\n' "$OUT" | grep -E '^(BUY |ADD |SELL )' || true)"
 HEAD="$(printf '%s\n' "$OUT" | grep -E '^SCORECARD' || true)"
 if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
   # Send a message only when there is something actionable, plus a weekly scorecard (Fridays).
