@@ -198,6 +198,20 @@ no charset header from http.server = mojibake (fixed, verified by headless
 screenshot); the remote MCP fetcher refuses tailnet URLs by design — visual
 checks run via the local headless-fetch skill on the Mini itself.
 
+**Tier alerts retired to log-only (2026-07-09):** the FULL/HALF confluence
+tier stream — the pre-BOOK strategy left running "unchanged" when the one
+strategy was built — sent `TWST | HALF` at 17:27 while the book rejected
+TWST as unqualified at 21:35 the same day: two systems, opposite verdicts,
+one Telegram thread, and Michael read the tier line as an instruction.
+Ruling: Telegram carries ONLY the book's BUY/ADD/SELL; tier scoring
+continues silently into run.log. The general lesson: when a design is
+superseded, its alert surface must be retired WITH it — a zombie stream
+that still pushes to the same channel is not "kept for reference," it is a
+second voice contradicting the strategy. (Same week, third variant of the
+lesson: the parallel-session pullback screener holds a third verdict on the
+same tickers — different account, different philosophy — kept on its own
+visibly distinct stream, never merged.)
+
 **Prime-report pillars (2026-07-06):** the journal's primary market picture is
 now Alex's own nightly 5-pillar checklist from the prime-report channel —
 `prime_pull.py` parses his verbatim verdicts (QQQE / Breadth / Internals /
